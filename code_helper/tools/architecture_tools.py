@@ -17,7 +17,24 @@ def _normalize_module_name(rel_path: str) -> str:
     return ".".join(parts)
 
 
-def analyze_imports(module_name: str = "") -> str:
+def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
+    """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+    if tool_context is not None:
+        state_write_ok = False
+        if hasattr(tool_context, "state") and tool_context.state is not None:
+            try:
+                tool_context.state["temp:final_text"] = output_text
+                state_write_ok = True
+            except Exception:
+                state_write_ok = False
+        if state_write_ok and hasattr(tool_context, "actions") and tool_context.actions is not None:
+            try:
+                tool_context.actions.skip_summarization = True
+            except Exception:
+                pass
+
+
+def analyze_imports(module_name: str = "", tool_context: Any = None) -> str:
     """
     Analyzes Python module dependencies and imports across the project.
     Use this tool to inspect the project-wide import graph, determine who imports a module,
@@ -53,6 +70,7 @@ def analyze_imports(module_name: str = "") -> str:
     # file_imports[rel_path] = list of {"imported": name, "line": line, "type": internal|stdlib|third_party}
     file_imports: dict[str, list[dict[str, Any]]] = {}
     all_third_party: set[str] = set()
+    local_definitions: dict[str, str] = {}
 
     for rel_path in scan_res.files:
         full_path = root / rel_path
@@ -65,6 +83,17 @@ def analyze_imports(module_name: str = "") -> str:
             tree = ast.parse(content, filename=rel_path)
         except SyntaxError:
             continue
+
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                local_definitions[node.name] = Path(rel_path).stem
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                if isinstance(node, ast.Assign):
+                    for t in node.targets:
+                        if isinstance(t, ast.Name):
+                            local_definitions[t.id] = Path(rel_path).stem
+                elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    local_definitions[node.target.id] = Path(rel_path).stem
 
         imports_in_file: list[dict[str, Any]] = []
 
@@ -82,6 +111,8 @@ def analyze_imports(module_name: str = "") -> str:
 
                     imports_in_file.append({
                         "name": alias.name,
+                        "symbols": [alias.name],
+                        "rep": alias.name,
                         "line": node.lineno,
                         "end_line": getattr(node, "end_lineno", node.lineno),
                         "type": imp_type,
@@ -101,10 +132,18 @@ def analyze_imports(module_name: str = "") -> str:
                     if top_name:
                         all_third_party.add(top_name)
 
-                imported_names = ", ".join(a.name for a in node.names)
+                symbol_list = [a.name for a in node.names]
+                if imp_type == "internal" and mod:
+                    for s in symbol_list:
+                        if s not in local_definitions:
+                            local_definitions[s] = mod
+
+                imported_names = ", ".join(symbol_list)
                 full_rep = f"{mod} ({imported_names})" if mod else imported_names
                 imports_in_file.append({
                     "name": mod or imported_names,
+                    "symbols": symbol_list,
+                    "module": mod,
                     "rep": full_rep,
                     "line": node.lineno,
                     "end_line": getattr(node, "end_lineno", node.lineno),
@@ -112,6 +151,7 @@ def analyze_imports(module_name: str = "") -> str:
                 })
 
         file_imports[rel_path] = imports_in_file
+
 
     # Mode 1: Empty or project root name -> Full internal graph + third-party summary
     is_full_project_query = (
@@ -131,21 +171,26 @@ def analyze_imports(module_name: str = "") -> str:
         lines.append("")
         sorted_tp = sorted(all_third_party)
         lines.append(f"Third-Party Dependencies ({len(sorted_tp)}): {', '.join(sorted_tp) if sorted_tp else 'None'}")
-        return cap_output("\n".join(lines))
+        output_text = cap_output("\n".join(lines))
+        _safe_store_final_text(tool_context, output_text)
+        return output_text
 
-    # Mode 2: Specific module_name
-    # Check if target module exists internally
+    # Mode 2: Specific module_name or symbol name
     target_stem = Path(query_mod).stem
     is_internal = query_mod in internal_mods or target_stem in internal_mods
 
-    # Find who imports this module
+    # Find who imports this module or symbol
     importers: list[tuple[str, int, int]] = []
+    matched_as_symbol = False
     for rel_path, imps in file_imports.items():
         for i in imps:
-            # Match module name or stem
             imp_name = i["name"]
             imp_top = imp_name.split(".")[0]
-            if imp_name == query_mod or imp_name == target_stem or imp_top == target_stem:
+            symbols = i.get("symbols", [])
+            if query_mod in symbols:
+                importers.append((rel_path, i["line"], i["end_line"]))
+                matched_as_symbol = True
+            elif imp_name == query_mod or imp_name == target_stem or imp_top == target_stem:
                 importers.append((rel_path, i["line"], i["end_line"]))
 
     # Find what this module imports (if it is an internal file)
@@ -157,6 +202,8 @@ def analyze_imports(module_name: str = "") -> str:
     lines = [f"Import Analysis for module '{query_mod}':\n"]
     if is_internal and matched_rel_path:
         lines.append(f"Module Type: Internal file ({matched_rel_path})\n")
+    elif query_mod in local_definitions:
+        lines.append(f"Module Type: Local symbol (defined in {local_definitions[query_mod]})\n")
     else:
         m_type = "Standard Library" if query_mod in stdlib_names else "Third-party / External"
         lines.append(f"Module Type: {m_type}\n")
@@ -176,4 +223,8 @@ def analyze_imports(module_name: str = "") -> str:
         else:
             lines.append("  (No import statements)")
 
-    return cap_output("\n".join(lines))
+    output_text = cap_output("\n".join(lines))
+    has_results = bool(importers or direct_imports)
+    if has_results:
+        _safe_store_final_text(tool_context, output_text)
+    return output_text

@@ -126,7 +126,7 @@ def load_settings(env_file_path: Path | None = None) -> Settings:
     except ValueError:
         raise ConfigError(f"Invalid integer value for TOP_K: {top_k_str}")
 
-    min_score_str = os.getenv("MIN_SCORE", "0.0").strip()
+    min_score_str = os.getenv("MIN_SCORE", "0.35").strip()
     try:
         min_score = float(min_score_str)
     except ValueError:

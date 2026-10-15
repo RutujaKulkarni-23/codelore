@@ -6,11 +6,8 @@ from code_helper.tools._context import get_project_root
 from code_helper.tools._paths import safe_resolve, cap_output, wrap_untrusted_code, PathSecurityError
 
 
-def get_file_outline(path: str) -> str:
-    """
-    Extract an outline of a Python source file including docstrings, imports, classes, methods, and functions.
-    Use this tool when you need a clear overview of the structure and exact line ranges of a specific file.
-    """
+def _parse_and_outline_file(path: str) -> tuple[str, int, str, list[str], list[str], list[str], dict[str, str]] | str:
+    """Safely resolves and parses a Python target file, returning AST outline components."""
     if not isinstance(path, str) or not path.strip():
         return "ERROR: path parameter cannot be empty or blank."
     if len(path) > 200:
@@ -41,15 +38,11 @@ def get_file_outline(path: str) -> str:
     except SyntaxError as e:
         return f"ERROR: Failed to parse Python syntax in '{path}': {e}"
 
-    lines = [f"Outline for {path} (total lines: {len(content.splitlines())}):\n"]
+    total_lines = len(content.splitlines())
 
     # Module docstring
     module_doc = ast.get_docstring(tree)
-    if module_doc:
-        first_doc_line = module_doc.strip().splitlines()[0]
-        lines.append(f"Module Docstring: \"{first_doc_line}\"\n")
-    else:
-        lines.append("Module Docstring: <none>\n")
+    first_doc_line = module_doc.strip().splitlines()[0] if module_doc else "<none>"
 
     # Imports
     import_entries: list[str] = []
@@ -63,40 +56,143 @@ def get_file_outline(path: str) -> str:
             dots = "." * node.level
             import_entries.append(f"  - L{node.lineno}: from {dots}{mod} import {names}")
 
-    if import_entries:
-        lines.append(f"Imports ({len(import_entries)}):")
-        lines.extend(import_entries)
-        lines.append("")
-
-    # Classes and top-level functions
+    # Classes, methods, and top-level functions
     definitions: list[str] = []
+    copy_ready_lines: list[str] = []
+    symbol_ranges: dict[str, str] = {}
+
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
             c_doc = ast.get_docstring(node)
             c_doc_first = f" - \"{c_doc.strip().splitlines()[0]}\"" if c_doc else ""
+            c_start = node.decorator_list[0].lineno if node.decorator_list else node.lineno
             c_end = getattr(node, "end_lineno", node.lineno)
-            definitions.append(f"Class: {node.name} -> {path}:{node.lineno}-{c_end}{c_doc_first}")
+            definitions.append(f"Class: {node.name} -> {path}:{c_start}-{c_end}{c_doc_first}")
+
+            bases_str = ", ".join(ast.unparse(b) for b in node.bases)
+            copy_ready_lines.append(f"{node.name}({bases_str}) - {path}:{c_start}-{c_end}")
+            if c_doc:
+                c_first_doc = next((line.strip() for line in c_doc.splitlines() if line.strip()), "")
+                if c_first_doc:
+                    copy_ready_lines.append(f"    {c_first_doc[:120]}")
+            symbol_ranges[node.name] = f"{path}:{c_start}-{c_end}"
 
             # Methods
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     m_doc = ast.get_docstring(item)
                     m_doc_first = f" - \"{m_doc.strip().splitlines()[0]}\"" if m_doc else ""
+                    m_start = item.decorator_list[0].lineno if item.decorator_list else item.lineno
                     m_end = getattr(item, "end_lineno", item.lineno)
                     kind_str = "async def" if isinstance(item, ast.AsyncFunctionDef) else "def"
-                    definitions.append(f"    • {kind_str} {item.name}() -> {path}:{item.lineno}-{m_end}{m_doc_first}")
+                    definitions.append(f"    • {kind_str} {item.name}() -> {path}:{m_start}-{m_end}{m_doc_first}")
+
+                    m_params = ast.unparse(item.args)
+                    copy_ready_lines.append(f"{node.name}.{item.name}({m_params}) - {path}:{m_start}-{m_end}")
+                    if m_doc:
+                        m_first_doc = next((line.strip() for line in m_doc.splitlines() if line.strip()), "")
+                        if m_first_doc:
+                            copy_ready_lines.append(f"    {m_first_doc[:120]}")
+                    symbol_ranges[f"{node.name}.{item.name}"] = f"{path}:{m_start}-{m_end}"
+                    symbol_ranges[item.name] = f"{path}:{m_start}-{m_end}"
 
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             f_doc = ast.get_docstring(node)
             f_doc_first = f" - \"{f_doc.strip().splitlines()[0]}\"" if f_doc else ""
+            f_start = node.decorator_list[0].lineno if node.decorator_list else node.lineno
             f_end = getattr(node, "end_lineno", node.lineno)
             kind_str = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
-            definitions.append(f"Function: {kind_str} {node.name}() -> {path}:{node.lineno}-{f_end}{f_doc_first}")
+            definitions.append(f"Function: {kind_str} {node.name}() -> {path}:{f_start}-{f_end}{f_doc_first}")
 
-    if definitions:
-        lines.append(f"Definitions ({len(definitions)}):")
-        lines.extend(definitions)
+            f_params = ast.unparse(node.args)
+            copy_ready_lines.append(f"{node.name}({f_params}) - {path}:{f_start}-{f_end}")
+            if f_doc:
+                f_first_doc = next((line.strip() for line in f_doc.splitlines() if line.strip()), "")
+                if f_first_doc:
+                    copy_ready_lines.append(f"    {f_first_doc[:120]}")
+            symbol_ranges[node.name] = f"{path}:{f_start}-{f_end}"
+
+    return path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges
+
+
+def get_file_outline(path: str, tool_context: Any = None) -> str:
+    """Use first, to find a function's line range before reading it."""
+    res = _parse_and_outline_file(path)
+    if isinstance(res, str):
+        return res
+    f_path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges = res
+
+    if tool_context is not None and hasattr(tool_context, "state"):
+        try:
+            tool_context.state["temp:symbol_ranges"] = symbol_ranges
+        except Exception:
+            pass
+
+    copy_ready_block = ["COPY-READY OUTLINE:"]
+    if copy_ready_lines:
+        copy_ready_block.extend(copy_ready_lines)
     else:
-        lines.append("Definitions: <no classes or functions defined>")
+        copy_ready_block.append("<no classes or functions defined>")
 
-    return cap_output("\n".join(lines))
+    def assemble(include_docstrings: bool = True, include_imports: bool = True, include_detail_defs: bool = True) -> str:
+        parts = [f"Outline for {f_path} (total lines: {total_lines}):\n"]
+        if include_docstrings:
+            parts.append(f"Module Docstring: \"{first_doc_line}\"\n")
+        if include_imports and import_entries:
+            parts.append(f"Imports ({len(import_entries)}):")
+            parts.extend(import_entries)
+            parts.append("")
+        if include_detail_defs:
+            if definitions:
+                parts.append(f"Definitions ({len(definitions)}):")
+                if include_docstrings:
+                    parts.extend(definitions)
+                else:
+                    parts.extend([d.split(" - \"")[0] for d in definitions])
+                parts.append("")
+            else:
+                parts.append("Definitions: <no classes or functions defined>\n")
+        parts.extend(copy_ready_block)
+        return "\n".join(parts)
+
+    full_text = assemble(include_docstrings=True, include_imports=True, include_detail_defs=True)
+    if len(full_text) > 5800:
+        full_text = assemble(include_docstrings=False, include_imports=True, include_detail_defs=True)
+    if len(full_text) > 5800:
+        full_text = assemble(include_docstrings=False, include_imports=False, include_detail_defs=True)
+    if len(full_text) > 5800:
+        full_text = assemble(include_docstrings=False, include_imports=False, include_detail_defs=False)
+
+    return cap_output(full_text)
+
+
+def show_file_outline(path: str, tool_context: Any = None) -> str:
+    """Use this when the user asks for an outline, structure or list of the functions/classes of ONE file. Its output is shown to the user as is."""
+    res = _parse_and_outline_file(path)
+    if isinstance(res, str):
+        return res
+    _, _, _, _, _, copy_ready_lines, _ = res
+
+    lines = ["COPY-READY OUTLINE:"]
+    if copy_ready_lines:
+        lines.extend(copy_ready_lines)
+    else:
+        lines.append("<no classes or functions defined>")
+
+    output_text = cap_output("\n".join(lines))
+
+    if tool_context is not None:
+        state_write_ok = False
+        if hasattr(tool_context, "state") and tool_context.state is not None:
+            try:
+                tool_context.state["temp:final_text"] = output_text
+                state_write_ok = True
+            except Exception:
+                state_write_ok = False
+        if state_write_ok and hasattr(tool_context, "actions") and tool_context.actions is not None:
+            try:
+                tool_context.actions.skip_summarization = True
+            except Exception:
+                pass
+
+    return output_text

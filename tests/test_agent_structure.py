@@ -1,3 +1,4 @@
+from pathlib import Path
 """
 Offline structural tests for Google ADK agent architecture in CodeLore.
 Validates:
@@ -44,11 +45,17 @@ def test_boss_has_no_tools():
 
 
 def test_least_privilege_tool_assignments():
+    from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+
     # code_searcher: rag_search, find_symbol
     assert code_searcher.tools == [rag_search, find_symbol]
 
-    # code_explainer: get_file_outline
-    assert code_explainer.tools == [get_file_outline]
+    # code_explainer: get_file_outline, show_file_outline plus MCP toolset
+    from code_helper.tools.explain_tools import show_file_outline
+    assert len(code_explainer.tools) == 3
+    assert code_explainer.tools[0] == get_file_outline
+    assert code_explainer.tools[1] == show_file_outline
+    assert isinstance(code_explainer.tools[2], McpToolset)
 
     # architecture_mapper: analyze_imports
     assert architecture_mapper.tools == [analyze_imports]
@@ -85,13 +92,95 @@ def test_boss_instruction_routing_rules():
 
 
 def test_custom_tools_count_and_non_ai():
-    all_assigned_tools = (
-        code_searcher.tools
-        + code_explainer.tools
-        + architecture_mapper.tools
-        + onboarding_guide.tools
-    )
-    assert len(all_assigned_tools) >= 5
-    # analyze_imports and find_symbol and get_file_outline are deterministic non-AI tools
-    non_ai_tools = [analyze_imports, find_symbol, get_file_outline, get_project_overview]
-    assert any(tool in all_assigned_tools for tool in non_ai_tools)
+    from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+
+    # The 6 custom project tools (excluding MCP toolset)
+    worker_lists = [
+        code_searcher.tools,
+        code_explainer.tools,
+        architecture_mapper.tools,
+        onboarding_guide.tools,
+    ]
+    custom_tools = [
+        tool for tools in worker_lists for tool in tools if not isinstance(tool, McpToolset)
+    ]
+    assert len(custom_tools) == 6, f"Expected 6 custom tools, got {len(custom_tools)}"
+    # Exactly one worker per custom tool (no shared tools)
+    assert len(custom_tools) == len(set(custom_tools)), "Each custom tool must be used by exactly one worker"
+
+    # Non-AI deterministic custom tools
+    from code_helper.tools.explain_tools import show_file_outline
+    non_ai_tools = [analyze_imports, find_symbol, get_file_outline, show_file_outline, get_project_overview]
+    assert any(tool in custom_tools for tool in non_ai_tools)
+
+def test_prompts_loop_limits_and_honest_label():
+    from code_helper import prompts
+    common = prompts.COMMON_WORKER_RULES
+    assert "at most 3 times" in common, "COMMON_WORKER_RULES must contain 'at most 3 times' loop limit"
+    assert "Never put 'I could not find that'" in common, "COMMON_WORKER_RULES must contain honest-label rule"
+
+
+def test_no_not_found_terms_in_prompts():
+    prompts_path = Path(__file__).resolve().parent.parent / "code_helper" / "prompts.py"
+    prompts_text = prompts_path.read_text(encoding="utf-8")
+    forbidden = ["Redis", "Slack", "Postgres", "Celery", "RabbitMQ"]
+    for term in forbidden:
+        assert term.lower() not in prompts_text.lower(), f"Forbidden target test term '{term}' leaked into prompts.py"
+
+
+
+def test_explainer_instruction_rules():
+    inst = code_explainer.instruction if isinstance(code_explainer.instruction, str) else ""
+    assert "WITHOUT line numbers" in inst, "code_explainer missing 'WITHOUT line numbers' directive"
+    assert "get_file_outline" in inst, "code_explainer missing 'get_file_outline' reference"
+
+
+def test_every_worker_instruction_names_all_tools():
+    expected_tools = [
+        (code_searcher, ["rag_search", "find_symbol"]),
+        (
+            code_explainer,
+            [
+                "show_file_outline",
+                "get_file_outline",
+                "read_text_file",
+                "list_directory",
+                "directory_tree",
+                "search_files",
+                "get_file_info",
+            ],
+        ),
+        (architecture_mapper, ["analyze_imports"]),
+        (onboarding_guide, ["get_project_overview"]),
+    ]
+    for agent, tool_names in expected_tools:
+        inst = agent.instruction if isinstance(agent.instruction, str) else ""
+        for tool_name in tool_names:
+            assert tool_name in inst, f"Agent {agent.name} instruction does not name tool '{tool_name}'"
+
+
+def test_worker_hardening_against_function_calls():
+    from code_helper import prompts
+    rules = prompts.COMMON_WORKER_RULES
+    assert "The ONLY tools you may call are the ones listed in your instructions" in rules
+    assert "Names of functions, classes or variables you see inside code are NOT tools; never call them" in rules
+    assert "If a tool call fails with 'not found', do NOT conclude the code is missing" in rules
+
+
+def test_shared_model_timeout_and_retries():
+    from code_helper.agent import shared_model
+    assert shared_model._additional_args.get("timeout") == 90
+    assert shared_model._additional_args.get("num_retries") == 1
+
+
+def test_onboarding_instruction_rules():
+    from code_helper.prompts import ONBOARDING_GUIDE_INSTRUCTION
+    assert "ENTRY POINT" in ONBOARDING_GUIDE_INSTRUCTION
+    assert "Never expand acronyms" in ONBOARDING_GUIDE_INSTRUCTION
+
+
+def test_explainer_explain_mode_rules():
+    from code_helper.prompts import CODE_EXPLAINER_INSTRUCTION
+    assert "Only describe what the code does" in CODE_EXPLAINER_INSTRUCTION
+    assert "No opinions about code quality" in CODE_EXPLAINER_INSTRUCTION
+    assert "name (file:start-end): what it does" in CODE_EXPLAINER_INSTRUCTION

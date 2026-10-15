@@ -9,6 +9,23 @@ from code_helper.rag.scanner import scan_python_files
 from code_helper.rag.search import search
 
 
+def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
+    """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+    if tool_context is not None:
+        state_write_ok = False
+        if hasattr(tool_context, "state") and tool_context.state is not None:
+            try:
+                tool_context.state["temp:final_text"] = output_text
+                state_write_ok = True
+            except Exception:
+                state_write_ok = False
+        if state_write_ok and hasattr(tool_context, "actions") and tool_context.actions is not None:
+            try:
+                tool_context.actions.skip_summarization = True
+            except Exception:
+                pass
+
+
 def rag_search(query: str, top_k: int = 5) -> str:
     """
     Search indexed code chunks using semantic embeddings and Pinecone vector search.
@@ -21,7 +38,15 @@ def rag_search(query: str, top_k: int = 5) -> str:
         return f"ERROR: query parameter length ({len(query)}) exceeds maximum limit of 200 characters."
     if top_k is None:
         top_k = 3
-    elif not isinstance(top_k, int) or top_k < 1 or top_k > 20:
+    elif isinstance(top_k, str):
+        try:
+            top_k = int(top_k.strip())
+        except ValueError:
+            return f"ERROR: top_k parameter must be an integer between 1 and 20, got {top_k}."
+    elif not isinstance(top_k, int) or isinstance(top_k, bool):
+        return f"ERROR: top_k parameter must be an integer between 1 and 20, got {top_k}."
+
+    if top_k < 1 or top_k > 20:
         return f"ERROR: top_k parameter must be an integer between 1 and 20, got {top_k}."
 
     try:
@@ -56,7 +81,7 @@ def rag_search(query: str, top_k: int = 5) -> str:
     return cap_output("\n".join(lines))
 
 
-def find_symbol(name: str) -> str:
+def find_symbol(name: str, tool_context: Any = None) -> str:
     """
     Locates definition locations of functions, classes, methods, or module-level constants.
     Use this tool when you know the exact or approximate name of a symbol (e.g. 'RAGConfig',
@@ -113,6 +138,10 @@ def find_symbol(name: str) -> str:
             # Top-level Functions
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 sig = file_lines[node.lineno - 1].strip() if node.lineno <= len(file_lines) else f"def {node.name}..."
+                try:
+                    param_sig = f"{node.name}({ast.unparse(node.args)})"
+                except Exception:
+                    param_sig = node.name
                 all_symbols.append({
                     "name": node.name,
                     "kind": "function" if isinstance(node, ast.FunctionDef) else "async_function",
@@ -120,6 +149,7 @@ def find_symbol(name: str) -> str:
                     "start_line": node.lineno,
                     "end_line": getattr(node, "end_lineno", node.lineno),
                     "signature": sig,
+                    "param_sig": param_sig,
                 })
 
             # Classes and methods
@@ -138,6 +168,10 @@ def find_symbol(name: str) -> str:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         method_full = f"{node.name}.{item.name}"
                         m_sig = file_lines[item.lineno - 1].strip() if item.lineno <= len(file_lines) else f"def {item.name}..."
+                        try:
+                            m_param_sig = f"{node.name}.{item.name}({ast.unparse(item.args)})"
+                        except Exception:
+                            m_param_sig = method_full
                         # Store both "Method" and "Class.method"
                         all_symbols.append({
                             "name": method_full,
@@ -147,6 +181,7 @@ def find_symbol(name: str) -> str:
                             "start_line": item.lineno,
                             "end_line": getattr(item, "end_lineno", item.lineno),
                             "signature": m_sig,
+                            "param_sig": m_param_sig,
                         })
 
     # 1. Exact match
@@ -175,8 +210,13 @@ def find_symbol(name: str) -> str:
     lines = [f"Found {len(matches)} definition(s) for symbol '{target_name}':\n"]
     for idx, m in enumerate(matches, start=1):
         citation = f"{m['path']}:{m['start_line']}-{m['end_line']}"
-        lines.append(f"[{idx}] {m['kind']} {m['name']} -> {citation}")
+        if m.get("param_sig"):
+            lines.append(f"[{idx}] {m['param_sig']} - {citation}")
+        else:
+            lines.append(f"[{idx}] {m['kind']} {m['name']} -> {citation}")
         lines.append(f"    Signature: {m['signature']}")
         lines.append("")
 
-    return cap_output("\n".join(lines))
+    output_text = cap_output("\n".join(lines))
+    _safe_store_final_text(tool_context, output_text)
+    return output_text

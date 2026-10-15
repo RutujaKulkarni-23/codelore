@@ -130,8 +130,8 @@ Read inside `get_rag_config()` ([config.py:L80-L154](file:///d:/CodeLore/targets
    - **Expected Answer Facts**: `main.py` is the top-level coordinator importing `config.py`, `indexer.py`, and `query_pipeline.py`. Both `indexer.py` and `query_pipeline.py` depend on `config.py` and `vector_store.py`. `vector_store.py` depends on `config.py`. `config.py` has no internal project dependencies.
    - **Evidence**: [main.py:L31-L36](file:///d:/CodeLore/targets/Naive_RAG/main.py#L31-L36), [indexer.py:L26-L27](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L26-L27), [query_pipeline.py:L23-L24](file:///d:/CodeLore/targets/Naive_RAG/query_pipeline.py#L23-L24), [vector_store.py:L22](file:///d:/CodeLore/targets/Naive_RAG/vector_store.py#L22).
 2. **Question**: *What are the 8 architectural stages of the RAG pipeline described in Naive_RAG?*
-   - **Expected Worker**: Architecture Mapper
-   - **Expected Answer Facts**: Stage 1: Document Ingestion, Stage 2: Chunking, Stage 3: Embedding Generation, Stage 4: Storage, Stage 5: Live Query Embedding, Stage 6: Vector Retrieval, Stage 7: Context Augmentation, Stage 8: Grounded Generation.
+   - **Expected Worker**: Code Searcher
+   - **Expected Answer Facts**: Stage 1: Document Ingestion, Stage 2: Chunking, Stage 3: Embedding Generation, Stage 4: Storage, Stage 5: Live Query Embedding, Stage 6: Vector Retrieval, Stage 7: Context Augmentation, Stage 8: Grounded Generation. (Note: Architecture Mapper cannot answer this question from import analysis alone; the stages are defined in code text inside `main.py:99-102` and spec documentation).
    - **Evidence**: [main.py:L99-L102](file:///d:/CodeLore/targets/Naive_RAG/main.py#L99-L102), [Day4_Naive_RAG_Project_Build_Spec.md:L24-L37](file:///d:/CodeLore/targets/Naive_RAG/Day4_Naive_RAG_Project_Build_Spec.md#L24-L37).
 
 ### Category 2: Code Searcher
@@ -141,28 +141,42 @@ Read inside `get_rag_config()` ([config.py:L80-L154](file:///d:/CodeLore/targets
    - **Evidence**: [config.py:L105](file:///d:/CodeLore/targets/Naive_RAG/config.py#L105).
 4. **Question**: *What chunk size and chunk overlap values are used by default when chunking documents?*
    - **Expected Worker**: Code Searcher
-   - **Expected Answer Facts**: `chunk_size = 500` characters and `chunk_overlap = 100` characters.
-   - **Evidence**: [config.py:L110-L115](file:///d:/CodeLore/targets/Naive_RAG/config.py#L110-L115), [indexer.py:L55-L66](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L55-L66).
+   - **Expected Answer Facts**: Two default levels exist: (1) In `chunk_document()` function signature defaults, `chunk_size = 350` characters and `chunk_overlap = 50` characters ([indexer.py:L57-L58](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L57-L58)). (2) In `get_rag_config()` configuration defaults, `chunk_size = 500` characters (overridden by `CHUNK_SIZE` env var) and `chunk_overlap = 100` characters (overridden by `CHUNK_OVERLAP` env var) ([config.py:L110-L118](file:///d:/CodeLore/targets/Naive_RAG/config.py#L110-L118)), which `run_indexing_pipeline()` passes to `chunk_document()` ([indexer.py:L248-L249](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L248-L249)).
+   - **Evidence**: [indexer.py:L57-L58](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L57-L58), [config.py:L110-L118](file:///d:/CodeLore/targets/Naive_RAG/config.py#L110-L118), [indexer.py:L248-L249](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L248-L249).
 5. **Question**: *Where is Redis configured or connected in this repository?*
    - **Expected Worker**: Code Searcher
    - **Expected Answer Facts**: Not found in this codebase. The repository contains no Redis client or connection configuration.
    - **Evidence**: Verified codebase search across all repository files.
 
-### Category 3: Code Explainer
+<!-- Phase 6 Worker Routing Rules Alignment:
+  - Default values, definitions, and code behavior details -> code_searcher (searches code text).
+  - Outline / structure / class & function lists of ONE named file -> code_explainer.
+  - CLI flags and options -> onboarding_guide.
+  - Dependency graphs and import topology -> architecture_mapper.
+  Note: In Phase 6, code_explainer only exposes get_file_outline (structure only, no code bodies).
+  After Phase 7 adds the Filesystem MCP read tool, questions of the form 'explain how function X in file Y works'
+  will be re-assigned to code_explainer.
+-->
+
+### Category 3: Code Explainer (Phase 6: File Structure & Outlines; Phase 7: Deep Explanations)
 6. **Question**: *How does `chunk_document` in `indexer.py` partition text, and what metadata does each chunk receive?*
-   - **Expected Worker**: Code Explainer
-   - **Expected Answer Facts**: Uses a character-sliding window starting at index `0` and advancing by `step = chunk_size - chunk_overlap`. Strips each slice and appends a dictionary with keys `"id"` (formatted as `chunk-0001`), `"text"`, `"start_char"`, `"end_char"`, and `"char_count"`.
+   - **Expected Worker**: Code Explainer (after Phase 7)
+   - **Expected Answer Facts**: The function signature specifies default `chunk_size = 350` and `chunk_overlap = 50` ([indexer.py:L57-L58](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L57-L58)). It computes the stride using `step = chunk_size - chunk_overlap` ([indexer.py:L73](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L73)). It iterates across the text with a character-sliding window starting at `start = 0` and slicing `chunk_slice = text[start:start + chunk_size]` ([indexer.py:L85-L87](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L85-L87)), trimming whitespace with `.strip()` ([indexer.py:L90](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L90)). Each non-empty chunk produces a record with ID formatted as `f"doc_chunk_{chunk_index}"` ([indexer.py:L94](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L94)) and exactly four keys: `"id"`, `"text"`, `"start_char"`, and `"end_char"` ([indexer.py:L93-L98](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L93-L98)), advancing by `start = start + step` ([indexer.py:L108](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L108)).
    - **Evidence**: [indexer.py:L55-L111](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L55-L111).
-7. **Question**: *What happens when `upsert_to_vector_db` in `vector_store.py` falls back to local storage?*
+6b. **Question**: *Can you provide an outline of indexer.py and list its classes and functions?*
    - **Expected Worker**: Code Explainer
+   - **Expected Answer Facts**: Imports `math` (L22), `os` (L23), `Path` from `pathlib` (L24), `OpenAI` from `openai` (L25), `RAGConfig` and `get_rag_config` from `config` (L26), and `upsert_to_vector_db` from `vector_store` (L27). Defines 5 functions: `load_document` (L30-L52), `chunk_document` (L55-L111), `embed_chunks` (L114-L195), `store_in_vector_db` (L198-L221), and `run_indexing_pipeline` (L224-L268). Contains no class definitions.
+   - **Evidence**: [indexer.py:L1-L268](file:///d:/CodeLore/targets/Naive_RAG/indexer.py#L1-L268).
+7. **Question**: *What happens when `upsert_to_vector_db` in `vector_store.py` falls back to local storage?*
+   - **Expected Worker**: Code Searcher (Phase 6 behavior inquiry; re-assigned to Code Explainer after Phase 7 MCP read tools)
    - **Expected Answer Facts**: It iterates through the chunks, builds records with `"id"`, `"embedding"`, and `"metadata"` (containing `"text"` and `"chunk_id"`), and writes them to `data/local_vector_db.json` by opening the file in `"w"` mode, completely replacing existing contents with `json.dump()`.
    - **Evidence**: [vector_store.py:L144-L162](file:///d:/CodeLore/targets/Naive_RAG/vector_store.py#L144-L162).
 8. **Question**: *How does `query_vector_db` compute similarity when running in local offline mode?*
-   - **Expected Worker**: Code Explainer
+   - **Expected Worker**: Code Searcher (Phase 6 behavior inquiry; re-assigned to Code Explainer after Phase 7 MCP read tools)
    - **Expected Answer Facts**: Loads all records from `data/local_vector_db.json`, computes cosine similarity between the query vector and candidate vector using `calculate_cosine_similarity()`, sorts results descending by score, and slices the top `top_k` matches.
    - **Evidence**: [vector_store.py:L199-L233](file:///d:/CodeLore/targets/Naive_RAG/vector_store.py#L199-L233).
 9. **Question**: *Where is the Slack webhook notification dispatched after indexing finishes?*
-   - **Expected Worker**: Code Explainer
+   - **Expected Worker**: Code Searcher (Not Found)
    - **Expected Answer Facts**: Not found in this codebase. There is no Slack webhook integration or notification dispatcher implemented in `targets/Naive_RAG`.
    - **Evidence**: Verified codebase search across all repository files.
 

@@ -9,10 +9,28 @@ from code_helper.rag.scanner import scan_python_files, EXCLUDED_DIRS
 from code_helper.rag.secrets_mask import mask_secrets
 
 
-def get_project_overview() -> str:
+
+def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
+    """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+    if tool_context is not None:
+        state_write_ok = False
+        if hasattr(tool_context, "state") and tool_context.state is not None:
+            try:
+                tool_context.state["temp:final_text"] = output_text
+                state_write_ok = True
+            except Exception:
+                state_write_ok = False
+        if state_write_ok and hasattr(tool_context, "actions") and tool_context.actions is not None:
+            try:
+                tool_context.actions.skip_summarization = True
+            except Exception:
+                pass
+
+
+def get_project_overview(tool_context: Any = None) -> str:
     """
-    Generate a structural project overview including file tree, entry points, CLI flags,
-    dependencies, README status, and top-level data files.
+    Generate a structural project overview including entry point, how to run,
+    reading order, data files, dependency files, and documentation.
     Use this tool to orient yourself when first exploring a project or onboarding to it.
     """
     root = get_project_root()
@@ -23,38 +41,22 @@ def get_project_overview() -> str:
     scan_res = scan_python_files(root)
     total_py_files = len(scan_res.files)
 
-    # 2. Depth-limited file tree (up to depth 2)
-    tree_lines = []
-    data_files = []
+    # 2. File categorisation
+    data_dir = root / "data"
+    data_files: list[str] = []
+    if data_dir.exists() and data_dir.is_dir():
+        for p in sorted(data_dir.rglob("*")):
+            if p.is_file():
+                data_files.append(p.relative_to(root).as_posix())
 
-    def _walk_tree(dir_path: Path, current_depth: int, max_depth: int = 2) -> None:
-        if current_depth > max_depth:
-            return
-        try:
-            entries = sorted(dir_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
-        except Exception:
-            return
+    dep_candidates = ["requirements.txt", "requirements-dev.txt", "pyproject.toml", "setup.cfg", "setup.py", "Pipfile"]
+    dep_files = [c for c in dep_candidates if (root / c).is_file()]
 
-        for e in entries:
-            name = e.name
-            if name.startswith(".") or name in EXCLUDED_DIRS:
-                continue
+    doc_files = [p.relative_to(root).as_posix() for p in sorted(root.glob("*.md")) if p.is_file()]
 
-            rel = e.relative_to(root).as_posix()
-            indent = "  " * current_depth
-            if e.is_dir():
-                tree_lines.append(f"{indent}[dir]  {name}/")
-                _walk_tree(e, current_depth + 1, max_depth)
-            else:
-                tree_lines.append(f"{indent}[file] {name}")
-                # Track top-level data files without reading contents
-                if current_depth == 1 and name.lower().endswith((".json", ".csv", ".txt", ".parquet", ".db", ".sqlite")):
-                    data_files.append(rel)
-
-    _walk_tree(root, 1)
-
-    # 3. Entry points & CLI flags
-    entry_points: list[str] = []
+    # 3. Entry points & CLI flags via AST
+    entry_candidates_main_guard: list[str] = []
+    entry_candidates_both: list[str] = []
     cli_flags: list[dict[str, Any]] = []
 
     for rel_path in scan_res.files:
@@ -69,8 +71,8 @@ def get_project_overview() -> str:
         except SyntaxError:
             continue
 
-        # Look for if __name__ == "__main__"
         has_main_guard = False
+        has_argparse = False
         for node in tree.body:
             if isinstance(node, ast.If):
                 test = node.test
@@ -80,15 +82,22 @@ def get_project_overview() -> str:
                         for comp in test.comparators:
                             if isinstance(comp, ast.Constant) and comp.value == "__main__":
                                 has_main_guard = True
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                if isinstance(node, ast.Import):
+                    for a in node.names:
+                        if a.name == "argparse":
+                            has_argparse = True
+                elif isinstance(node, ast.ImportFrom) and node.module == "argparse":
+                    has_argparse = True
 
         if has_main_guard:
-            entry_points.append(rel_path)
+            entry_candidates_main_guard.append(rel_path)
 
-        # Look for parser.add_argument(...)
         for subnode in ast.walk(tree):
             if isinstance(subnode, ast.Call):
                 func = subnode.func
                 if isinstance(func, ast.Attribute) and func.attr == "add_argument":
+                    has_argparse = True
                     flag_args = []
                     for arg in subnode.args:
                         if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
@@ -106,66 +115,121 @@ def get_project_overview() -> str:
                             "help": help_text,
                         })
 
-    # 4. Dependency files
-    dep_summary: list[str] = []
-    candidate_deps = ["requirements.txt", "requirements-dev.txt", "pyproject.toml", "setup.cfg"]
-    for c_name in candidate_deps:
-        p = root / c_name
-        if p.exists() and p.is_file():
-            try:
-                raw_lines = p.read_text(encoding="utf-8").splitlines()
-            except UnicodeDecodeError:
-                raw_lines = p.read_bytes().decode("utf-8", errors="replace").splitlines()
+        if has_main_guard and has_argparse:
+            entry_candidates_both.append(rel_path)
 
-            first_40 = "\n".join(raw_lines[:40])
-            masked_content, _ = mask_secrets(first_40)
-            dep_summary.append(f"File '{c_name}' (showing first 40 lines):\n{masked_content}")
+    chosen_entry = None
+    if entry_candidates_both:
+        chosen_entry = "main.py" if "main.py" in entry_candidates_both else entry_candidates_both[0]
+    elif entry_candidates_main_guard:
+        chosen_entry = "main.py" if "main.py" in entry_candidates_main_guard else entry_candidates_main_guard[0]
 
-    # 5. README presence
-    readme_files = list(root.glob("README*"))
-    readme_status = f"README found: {readme_files[0].name}" if readme_files else "No README found"
+    also_runnable = [ep for ep in entry_candidates_main_guard if ep != chosen_entry]
 
-    # Assemble report
-    out: list[str] = [
-        f"Project Overview for {root.name} ({total_py_files} Python file(s)):\n",
-        f"1. Documentation: {readme_status}\n",
-        f"2. File Tree (depth limit 2):",
-    ]
-    out.extend(tree_lines[:40])
-    if len(tree_lines) > 40:
-        out.append("   ... (additional files omitted)")
-    out.append("")
+    # Extract stages from chosen_entry or other files
+    stages: list[str] = []
+    if chosen_entry and (root / chosen_entry).exists():
+        try:
+            m_text = (root / chosen_entry).read_text(encoding="utf-8")
+        except Exception:
+            m_text = (root / chosen_entry).read_bytes().decode("utf-8", errors="replace")
+        for line in m_text.splitlines():
+            if "[Stage " in line:
+                for part in line.split("[Stage "):
+                    if "]" in part:
+                        st_num, rest = part.split("]", 1)
+                        st_name = rest.split("-->")[0].split("\\n")[0].split('")')[0].split("')")[0].strip()
+                        if st_num.strip().isdigit() and st_name:
+                            stages.append(f"Stage {st_num.strip()}: {st_name}")
 
-    out.append(f"3. Entry Points ({len(entry_points)} found):")
-    if entry_points:
-        for ep in entry_points:
-            out.append(f"  - {ep} (contains '__main__' guard)")
+    # Build output
+    lines: list[str] = ["Here is what I can tell you about this codebase:\n"]
+
+    # Section 1: What it is
+    lines.append("What it is:")
+    if stages:
+        lines.append("The entry point prints these stages:")
+        for st in stages:
+            lines.append(f"  - {st}")
     else:
-        out.append("  (No entry points found)")
-    out.append("")
+        lines.append(f"A Python project with {total_py_files} Python file(s).")
+    lines.append("")
 
-    out.append(f"4. Command-Line Flags ({len(cli_flags)} found):")
-    if cli_flags:
-        for fl in cli_flags:
-            flags_str = ", ".join(fl["flags"])
-            help_str = f" - {fl['help']}" if fl['help'] else ""
-            out.append(f"  - {fl['file']}:L{fl['line']} -> {flags_str}{help_str}")
+    # Section 2: Start here
+    lines.append("Start here:")
+    if chosen_entry:
+        lines.append(f"  ENTRY POINT: {chosen_entry}")
+    if also_runnable:
+        lines.append(f"  Also runnable as scripts: {', '.join(also_runnable)}")
+    lines.append("")
+
+    # Section 3: How to run
+    lines.append("How to run:")
+    how_to_run_flags = []
+    if chosen_entry:
+        target_flags = [fl for fl in cli_flags if fl["file"] == chosen_entry]
+        if not target_flags and cli_flags:
+            target_flags = cli_flags
+        if target_flags:
+            for fl in target_flags:
+                for f_name in fl["flags"]:
+                    if f_name.startswith("-"):
+                        how_to_run_flags.append(f"python {chosen_entry} {f_name}")
+    if how_to_run_flags:
+        for cmd in how_to_run_flags:
+            lines.append(f"  - {cmd}")
+    elif chosen_entry:
+        lines.append(f"  - python {chosen_entry}")
     else:
-        out.append("  (No CLI arguments found)")
-    out.append("")
+        lines.append("  (No runnable entry point found)")
+    lines.append("")
 
-    out.append(f"5. Top-Level Data Files ({len(data_files)} found):")
-    if data_files:
-        for df in data_files:
-            out.append(f"  - {df}")
-    else:
-        out.append("  (No top-level data files found)")
-    out.append("")
+    # Section 4: Read the files in this order
+    lines.append("Read the files in this order:")
+    reading_order = []
+    if "config.py" in scan_res.files:
+        reading_order.append("config.py")
+    for f in scan_res.files:
+        if f not in reading_order and f != chosen_entry:
+            reading_order.append(f)
+    if chosen_entry and chosen_entry not in reading_order and chosen_entry in scan_res.files:
+        reading_order.append(chosen_entry)
 
-    out.append(f"6. Dependency Files ({len(dep_summary)} found):")
-    if dep_summary:
-        out.extend(dep_summary)
-    else:
-        out.append("  (No standard dependency files like requirements.txt found)")
+    for idx, f in enumerate(reading_order, 1):
+        f_doc_line = ""
+        full_f = root / f
+        try:
+            f_content = full_f.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            f_content = full_f.read_bytes().decode("utf-8", errors="replace")
+        try:
+            f_tree = ast.parse(f_content, filename=f)
+            mod_doc = ast.get_docstring(f_tree)
+            if mod_doc:
+                first_non_empty = next((l.strip() for l in mod_doc.splitlines() if l.strip()), "")
+                if first_non_empty:
+                    base_name = Path(f).name
+                    for prefix_cand in (f"{f} — ", f"{base_name} — ", f"{f} - ", f"{base_name} - ", f"{f} – ", f"{base_name} – "):
+                        if first_non_empty.startswith(prefix_cand):
+                            first_non_empty = first_non_empty[len(prefix_cand):].strip()
+                            break
+                    f_doc_line = f" - {first_non_empty[:100]}"
+        except Exception:
+            pass
 
-    return cap_output("\n".join(out))
+        lines.append(f"  {idx}. {f}{f_doc_line}")
+    lines.append("")
+
+    # Section 5: Other files
+    lines.append("Other files:")
+    data_str = ", ".join(data_files) if data_files else "None"
+    dep_str = ", ".join(dep_files) if dep_files else "None"
+    doc_str = ", ".join(doc_files) if doc_files else "None"
+    lines.append(f"  - Data files (under data/): {data_str}")
+    lines.append(f"  - Dependency files: {dep_str}")
+    lines.append(f"  - Documentation: {doc_str}")
+
+    output_text = cap_output("\n".join(lines))
+    _safe_store_final_text(tool_context, output_text)
+    return output_text
+
