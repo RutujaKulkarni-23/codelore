@@ -28,6 +28,16 @@ class Settings:
     top_k: int
     min_score: float
     pythonutf8: str
+    max_chunk_lines: int = 60
+    chunk_overlap_lines: int = 8
+    max_chunk_chars: int = 3000
+    chunk_strategy: str = "ast_hybrid"
+    max_files: int = 2000
+    max_file_bytes: int = 200000
+    embed_batch_size: int = 16
+    max_query_chars: int = 2000
+    metadata_text_max_bytes: int = 8000
+    embed_timeout_seconds: int = 30
 
     def __repr__(self) -> str:
         def _mask(val: str) -> str:
@@ -52,7 +62,17 @@ class Settings:
             f"target_project_path='{self.target_project_path}', "
             f"top_k={self.top_k}, "
             f"min_score={self.min_score}, "
-            f"pythonutf8='{self.pythonutf8}'"
+            f"pythonutf8='{self.pythonutf8}', "
+            f"max_chunk_lines={self.max_chunk_lines}, "
+            f"chunk_overlap_lines={self.chunk_overlap_lines}, "
+            f"max_chunk_chars={self.max_chunk_chars}, "
+            f"chunk_strategy='{self.chunk_strategy}', "
+            f"max_files={self.max_files}, "
+            f"max_file_bytes={self.max_file_bytes}, "
+            f"embed_batch_size={self.embed_batch_size}, "
+            f"max_query_chars={self.max_query_chars}, "
+            f"metadata_text_max_bytes={self.metadata_text_max_bytes}, "
+            f"embed_timeout_seconds={self.embed_timeout_seconds}"
             f")"
         )
 
@@ -112,6 +132,26 @@ def load_settings(env_file_path: Path | None = None) -> Settings:
     except ValueError:
         raise ConfigError(f"Invalid float value for MIN_SCORE: {min_score_str}")
 
+    def _parse_int_opt(var_name: str, default_val: int) -> int:
+        raw = os.getenv(var_name, "").strip()
+        if not raw:
+            return default_val
+        try:
+            return int(raw)
+        except ValueError:
+            raise ConfigError(f"Invalid integer value for {var_name}: {raw}")
+
+    max_chunk_lines = _parse_int_opt("MAX_CHUNK_LINES", 60)
+    chunk_overlap_lines = _parse_int_opt("CHUNK_OVERLAP_LINES", 8)
+    max_chunk_chars = _parse_int_opt("MAX_CHUNK_CHARS", 3000)
+    chunk_strategy = os.getenv("CHUNK_STRATEGY", "ast_hybrid").strip() or "ast_hybrid"
+    max_files = _parse_int_opt("MAX_FILES", 2000)
+    max_file_bytes = _parse_int_opt("MAX_FILE_BYTES", 200000)
+    embed_batch_size = _parse_int_opt("EMBED_BATCH_SIZE", 16)
+    max_query_chars = _parse_int_opt("MAX_QUERY_CHARS", 2000)
+    metadata_text_max_bytes = _parse_int_opt("METADATA_TEXT_MAX_BYTES", 8000)
+    embed_timeout_seconds = _parse_int_opt("EMBED_TIMEOUT_SECONDS", 30)
+
     return Settings(
         nvidia_api_key=nvidia_key,
         nvidia_nim_api_key=nim_key,
@@ -127,4 +167,14 @@ def load_settings(env_file_path: Path | None = None) -> Settings:
         top_k=top_k,
         min_score=min_score,
         pythonutf8=os.getenv("PYTHONUTF8", "1").strip(),
+        max_chunk_lines=max_chunk_lines,
+        chunk_overlap_lines=chunk_overlap_lines,
+        max_chunk_chars=max_chunk_chars,
+        chunk_strategy=chunk_strategy,
+        max_files=max_files,
+        max_file_bytes=max_file_bytes,
+        embed_batch_size=embed_batch_size,
+        max_query_chars=max_query_chars,
+        metadata_text_max_bytes=metadata_text_max_bytes,
+        embed_timeout_seconds=embed_timeout_seconds,
     )
