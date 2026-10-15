@@ -9,13 +9,18 @@ from code_helper.rag.scanner import scan_python_files
 from code_helper.rag.search import search
 
 
-def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
-    """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+def _safe_store_final_text(tool_context: Any, output_text: str, final_struct: dict[str, Any] | None = None) -> None:
+    """Safely stores output_text and optional final_struct in temp state and sets skip_summarization."""
+    if final_struct:
+        from code_helper.tools._final_struct_registry import set_last_final_struct
+        set_last_final_struct(final_struct)
     if tool_context is not None:
         state_write_ok = False
         if hasattr(tool_context, "state") and tool_context.state is not None:
             try:
                 tool_context.state["temp:final_text"] = output_text
+                if final_struct:
+                    tool_context.state["temp:final_struct"] = final_struct
                 state_write_ok = True
             except Exception:
                 state_write_ok = False
@@ -142,6 +147,8 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
                     param_sig = f"{node.name}({ast.unparse(node.args)})"
                 except Exception:
                     param_sig = node.name
+                f_doc = ast.get_docstring(node) or ""
+                first_f_doc = next((line.strip() for line in f_doc.splitlines() if line.strip()), "")[:120] if f_doc else ""
                 all_symbols.append({
                     "name": node.name,
                     "kind": "function" if isinstance(node, ast.FunctionDef) else "async_function",
@@ -150,11 +157,14 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
                     "end_line": getattr(node, "end_lineno", node.lineno),
                     "signature": sig,
                     "param_sig": param_sig,
+                    "doc": first_f_doc,
                 })
 
             # Classes and methods
             elif isinstance(node, ast.ClassDef):
                 sig = file_lines[node.lineno - 1].strip() if node.lineno <= len(file_lines) else f"class {node.name}..."
+                c_doc = ast.get_docstring(node) or ""
+                first_c_doc = next((line.strip() for line in c_doc.splitlines() if line.strip()), "")[:120] if c_doc else ""
                 all_symbols.append({
                     "name": node.name,
                     "kind": "class",
@@ -162,6 +172,7 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
                     "start_line": node.lineno,
                     "end_line": getattr(node, "end_lineno", node.lineno),
                     "signature": sig,
+                    "doc": first_c_doc,
                 })
 
                 for item in node.body:
@@ -172,6 +183,8 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
                             m_param_sig = f"{node.name}.{item.name}({ast.unparse(item.args)})"
                         except Exception:
                             m_param_sig = method_full
+                        m_doc = ast.get_docstring(item) or ""
+                        first_m_doc = next((line.strip() for line in m_doc.splitlines() if line.strip()), "")[:120] if m_doc else ""
                         # Store both "Method" and "Class.method"
                         all_symbols.append({
                             "name": method_full,
@@ -182,6 +195,7 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
                             "end_line": getattr(item, "end_lineno", item.lineno),
                             "signature": m_sig,
                             "param_sig": m_param_sig,
+                            "doc": first_m_doc,
                         })
 
     # 1. Exact match
@@ -208,15 +222,29 @@ def find_symbol(name: str, tool_context: Any = None) -> str:
 
     # Format output
     lines = [f"Found {len(matches)} definition(s) for symbol '{target_name}':\n"]
+    struct_items: list[dict[str, Any]] = []
     for idx, m in enumerate(matches, start=1):
         citation = f"{m['path']}:{m['start_line']}-{m['end_line']}"
+        sig_display = m.get("param_sig") or m["signature"]
         if m.get("param_sig"):
             lines.append(f"[{idx}] {m['param_sig']} - {citation}")
         else:
             lines.append(f"[{idx}] {m['kind']} {m['name']} -> {citation}")
         lines.append(f"    Signature: {m['signature']}")
         lines.append("")
+        struct_items.append({
+            "name": m["name"],
+            "signature": sig_display,
+            "path": m["path"],
+            "start": m["start_line"],
+            "end": m["end_line"],
+            "doc": m.get("doc", ""),
+        })
 
     output_text = cap_output("\n".join(lines))
-    _safe_store_final_text(tool_context, output_text)
+    final_struct = {
+        "kind": "symbol",
+        "items": struct_items,
+    }
+    _safe_store_final_text(tool_context, output_text, final_struct)
     return output_text

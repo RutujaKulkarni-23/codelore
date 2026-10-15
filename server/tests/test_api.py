@@ -273,3 +273,78 @@ def test_rate_limit_returns_429_on_9th_call(client):
         res_9 = client.post("/api/ask", json={"question": "Question 9?"})
         assert res_9.status_code == 429
         assert "Too many case requests" in res_9.json()["detail"]
+
+
+def test_ask_previous_invocation_not_forwarded(client):
+    reset_rate_limits()
+
+    # Events from an old invocation should be filtered out
+    events_mock = [
+        # Current invocation event 1
+        SimpleNamespace(
+            invocation_id="inv_new",
+            author="boss",
+            get_function_calls=lambda: [],
+            get_function_responses=lambda: [],
+            content=None,
+        ),
+        # Current invocation event 2
+        SimpleNamespace(
+            invocation_id="inv_new",
+            author="code_explainer",
+            get_function_calls=lambda: [],
+            get_function_responses=lambda: [],
+            content=SimpleNamespace(parts=[SimpleNamespace(text="New answer here")]),
+        ),
+        # Stale/old event with different invocation_id
+        SimpleNamespace(
+            invocation_id="inv_old",
+            author="onboarding_guide",
+            get_function_calls=lambda: [],
+            get_function_responses=lambda: [],
+            content=SimpleNamespace(parts=[SimpleNamespace(text="Old stale answer from past question")]),
+        ),
+    ]
+
+    class MockAsyncRunner:
+        async def run_async(self, **kwargs):
+            for ev in events_mock:
+                yield ev
+
+    with patch("server.app.create_adk_runner", return_value=MockAsyncRunner()):
+        res = client.post("/api/ask", json={"question": "Explain something?"})
+        assert res.status_code == 200
+
+        text = res.text
+        events = []
+        current_event = None
+        for line in text.splitlines():
+            if line.startswith("event: "):
+                current_event = line.replace("event: ", "").strip()
+            elif line.startswith("data: ") and current_event:
+                data_val = json.loads(line.replace("data: ", "").strip())
+                events.append((current_event, data_val))
+                current_event = None
+
+        # Verify that EVERY event has a valid turn_id
+        assert len(events) > 0
+        turn_id = events[0][1].get("turn_id")
+        assert turn_id is not None
+        for ev_name, ev_data in events:
+            assert ev_data.get("turn_id") == turn_id
+
+        # Verify that inv_old's text and agent were NOT forwarded
+        agents_seen = [ev_data.get("agent") for ev_name, ev_data in events if "agent" in ev_data]
+        assert "Onboarding Guide" not in agents_seen
+        assert "onboarding_guide" not in agents_seen
+
+        all_text = " ".join([ev_data.get("text", "") for ev_name, ev_data in events])
+        assert "Old stale answer" not in all_text
+        assert "New answer here" in all_text
+
+        # Verify verdict event was emitted
+        verdict_events = [ev_data for ev_name, ev_data in events if ev_name == "verdict"]
+        assert len(verdict_events) == 1
+        assert verdict_events[0]["kind"] == "text"
+        assert verdict_events[0]["turn_id"] == turn_id
+

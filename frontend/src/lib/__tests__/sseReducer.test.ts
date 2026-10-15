@@ -174,5 +174,165 @@ describe("SSE Event Reducer", () => {
     });
     expect(events[3]).toEqual({ type: "done", data: { seconds: 2.5 } });
   });
+
+  it("handles two turns of recorded events with isolated timelines and verdicts", () => {
+    let state = initialCaseState;
+
+    // Turn 1
+    const turn1Id = "turn-1-guid";
+    state = sseReducer(state, {
+      type: "start",
+      data: { turn_id: turn1Id, question: "Where should a beginner start?" },
+    });
+    state = sseReducer(state, {
+      type: "routed",
+      data: { turn_id: turn1Id, agent: "Boss" },
+    });
+    state = sseReducer(state, {
+      type: "tool_call",
+      data: {
+        turn_id: turn1Id,
+        agent: "Boss",
+        tool: "transfer_to_agent",
+        args: { agent_name: "onboarding_guide" },
+      },
+    });
+    state = sseReducer(state, {
+      type: "tool_done",
+      data: { turn_id: turn1Id, agent: "Boss", tool: "transfer_to_agent" },
+    });
+    state = sseReducer(state, {
+      type: "routed",
+      data: { turn_id: turn1Id, agent: "Onboarding Guide" },
+    });
+    state = sseReducer(state, {
+      type: "tool_call",
+      data: {
+        turn_id: turn1Id,
+        agent: "Onboarding Guide",
+        tool: "get_project_overview",
+        args: {},
+      },
+    });
+    state = sseReducer(state, {
+      type: "tool_done",
+      data: {
+        turn_id: turn1Id,
+        agent: "Onboarding Guide",
+        tool: "get_project_overview",
+      },
+    });
+    state = sseReducer(state, {
+      type: "verdict",
+      data: {
+        turn_id: turn1Id,
+        agent: "Onboarding Guide",
+        kind: "overview",
+        data: {
+          kind: "overview",
+          entry_point: "main.py",
+          reading_order: [{ path: "main.py", doc: "CLI entry point" }],
+        },
+      },
+    });
+    state = sseReducer(state, {
+      type: "citations",
+      data: { turn_id: turn1Id, items: [{ path: "main.py", start: 1, end: 50 }] },
+    });
+    state = sseReducer(state, {
+      type: "done",
+      data: { turn_id: turn1Id, seconds: 2.1 },
+    });
+
+    // Verify Turn 1 state
+    expect(state.turns).toHaveLength(1);
+    expect(state.turns[0].turn_id).toBe(turn1Id);
+    expect(state.turns[0].question).toBe("Where should a beginner start?");
+    expect(state.turns[0].timeline).toHaveLength(4); // Boss routed, transfer call, Guide routed, overview call
+    expect(state.turns[0].verdict?.kind).toBe("overview");
+    expect(state.turns[0].stats.durationSeconds).toBe(2.1);
+    expect(state.turns[0].stats.evidenceCount).toBe(1);
+
+    // Turn 2
+    const turn2Id = "turn-2-guid";
+    state = sseReducer(state, {
+      type: "start",
+      data: { turn_id: turn2Id, question: "Explain the functions in query_pipeline.py" },
+    });
+    state = sseReducer(state, {
+      type: "routed",
+      data: { turn_id: turn2Id, agent: "Code Explainer" },
+    });
+    state = sseReducer(state, {
+      type: "tool_call",
+      data: {
+        turn_id: turn2Id,
+        agent: "Code Explainer",
+        tool: "show_file_outline",
+        args: { file_path: "query_pipeline.py" },
+      },
+    });
+    state = sseReducer(state, {
+      type: "tool_done",
+      data: {
+        turn_id: turn2Id,
+        agent: "Code Explainer",
+        tool: "show_file_outline",
+      },
+    });
+    state = sseReducer(state, {
+      type: "verdict",
+      data: {
+        turn_id: turn2Id,
+        agent: "Code Explainer",
+        kind: "outline",
+        data: {
+          kind: "outline",
+          path: "query_pipeline.py",
+          items: [{ name: "embed_query", start: 27, end: 86, signature: "def embed_query()" }],
+        },
+      },
+    });
+    state = sseReducer(state, {
+      type: "citations",
+      data: { turn_id: turn2Id, items: [{ path: "query_pipeline.py", start: 27, end: 86 }] },
+    });
+    state = sseReducer(state, {
+      type: "done",
+      data: { turn_id: turn2Id, seconds: 1.4 },
+    });
+
+    // Verify Both Turns are completely isolated
+    expect(state.turns).toHaveLength(2);
+
+    // Turn 1 has ONLY its own steps
+    const t1 = state.turns[0];
+    expect(t1.turn_id).toBe(turn1Id);
+    expect(t1.question).toBe("Where should a beginner start?");
+    expect(t1.timeline).toHaveLength(4);
+    expect(t1.timeline.map((x) => x.title)).toEqual([
+      "Boss read the question",
+      "Boss chose Onboarding Guide",
+      "Onboarding Guide took the case",
+      "get_project_overview()",
+    ]);
+    expect(t1.verdict?.kind).toBe("overview");
+    expect(t1.stats.durationSeconds).toBe(2.1);
+    expect(t1.citations[0].path).toBe("main.py");
+
+    // Turn 2 has ONLY its own steps (NO Boss or Onboarding Guide from turn 1!)
+    const t2 = state.turns[1];
+    expect(t2.turn_id).toBe(turn2Id);
+    expect(t2.question).toBe("Explain the functions in query_pipeline.py");
+    expect(t2.timeline).toHaveLength(2);
+    expect(t2.timeline.map((x) => x.title)).toEqual([
+      "Code Explainer took the case",
+      'show_file_outline(file_path="query_pipeline.py")',
+    ]);
+    expect(t2.verdict?.kind).toBe("outline");
+    expect(t2.stats.durationSeconds).toBe(1.4);
+    expect(t2.citations[0].path).toBe("query_pipeline.py");
+  });
 });
+
 

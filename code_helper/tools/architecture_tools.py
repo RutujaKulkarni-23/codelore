@@ -17,13 +17,18 @@ def _normalize_module_name(rel_path: str) -> str:
     return ".".join(parts)
 
 
-def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
+def _safe_store_final_text(tool_context: Any, output_text: str, final_struct: dict[str, Any] | None = None) -> None:
     """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+    if final_struct:
+        from code_helper.tools._final_struct_registry import set_last_final_struct
+        set_last_final_struct(final_struct)
     if tool_context is not None:
         state_write_ok = False
         if hasattr(tool_context, "state") and tool_context.state is not None:
             try:
                 tool_context.state["temp:final_text"] = output_text
+                if final_struct:
+                    tool_context.state["temp:final_struct"] = final_struct
                 state_write_ok = True
             except Exception:
                 state_write_ok = False
@@ -172,7 +177,13 @@ def analyze_imports(module_name: str = "", tool_context: Any = None) -> str:
         sorted_tp = sorted(all_third_party)
         lines.append(f"Third-Party Dependencies ({len(sorted_tp)}): {', '.join(sorted_tp) if sorted_tp else 'None'}")
         output_text = cap_output("\n".join(lines))
-        _safe_store_final_text(tool_context, output_text)
+        final_struct = {
+            "kind": "imports",
+            "target": query_mod or root.name,
+            "defined_in": None,
+            "importers": [],
+        }
+        _safe_store_final_text(tool_context, output_text, final_struct)
         return output_text
 
     # Mode 2: Specific module_name or symbol name
@@ -209,9 +220,24 @@ def analyze_imports(module_name: str = "", tool_context: Any = None) -> str:
         lines.append(f"Module Type: {m_type}\n")
 
     lines.append(f"Imported by ({len(importers)} reference(s)):")
+    importers_struct: list[dict[str, Any]] = []
     if importers:
         for f_path, l_no, end_l in sorted(importers):
             lines.append(f"  - {f_path}:{l_no}-{end_l}")
+            stmt = ""
+            try:
+                full_f = root / f_path
+                content = full_f.read_text(encoding="utf-8")
+                f_lines = content.splitlines()
+                if 1 <= l_no <= len(f_lines):
+                    stmt = f_lines[l_no - 1].strip()
+            except Exception:
+                stmt = ""
+            importers_struct.append({
+                "path": f_path,
+                "line": l_no,
+                "statement": stmt,
+            })
     else:
         lines.append("  (No files in the project import this module)")
 
@@ -225,6 +251,20 @@ def analyze_imports(module_name: str = "", tool_context: Any = None) -> str:
 
     output_text = cap_output("\n".join(lines))
     has_results = bool(importers or direct_imports)
+    defined_in_val = None
+    if query_mod in local_definitions:
+        defined_in_val = local_definitions[query_mod]
+        if not defined_in_val.endswith(".py"):
+            defined_in_val = f"{defined_in_val}.py"
+    elif is_internal and matched_rel_path:
+        defined_in_val = matched_rel_path
+
+    final_struct = {
+        "kind": "imports",
+        "target": query_mod,
+        "defined_in": defined_in_val,
+        "importers": importers_struct,
+    }
     if has_results:
-        _safe_store_final_text(tool_context, output_text)
+        _safe_store_final_text(tool_context, output_text, final_struct)
     return output_text

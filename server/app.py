@@ -8,6 +8,7 @@ import time
 import unicodedata
 from pathlib import Path
 from typing import Any, Optional
+import uuid
 
 try:
     import litellm
@@ -658,6 +659,7 @@ async def ask_question(request: Request, body: AskRequest):
     if len(cleaned_q) > 500:
         raise HTTPException(status_code=400, detail="Question exceeds maximum allowed length of 500 characters.")
 
+    turn_id = str(uuid.uuid4())
     session_id = body.session_id or f"session_{int(time.time() * 1000)}"
     root = get_project_root()
 
@@ -666,12 +668,14 @@ async def ask_question(request: Request, body: AskRequest):
         t_start = time.time()
         final_answer = ""
         routed_agents = set()
+        current_invocation_id = None
+        captured_struct = None
 
         try:
             # Emit session event first
             yield {
                 "event": "session",
-                "data": json.dumps({"session_id": session_id}),
+                "data": json.dumps({"turn_id": turn_id, "session_id": session_id}),
             }
 
             runner = create_adk_runner()
@@ -697,6 +701,17 @@ async def ask_question(request: Request, body: AskRequest):
 
             # Stream events directly from runner
             async for ev in get_events():
+                inv_id = getattr(ev, "invocation_id", None)
+                if current_invocation_id is None and inv_id:
+                    current_invocation_id = inv_id
+                if current_invocation_id and inv_id and inv_id != current_invocation_id:
+                    # Skip events of a previous or different invocation
+                    continue
+
+                if hasattr(ev, "actions") and ev.actions and ev.actions.state_delta:
+                    if "temp:final_struct" in ev.actions.state_delta:
+                        captured_struct = ev.actions.state_delta["temp:final_struct"]
+
                 raw_author = getattr(ev, "author", "") or ""
                 display_author = AGENT_DISPLAY_NAMES.get(raw_author, raw_author or "Boss")
                 if display_author != "user":
@@ -707,7 +722,7 @@ async def ask_question(request: Request, body: AskRequest):
                     routed_agents.add(raw_author)
                     yield {
                         "event": "routed",
-                        "data": json.dumps({"agent": display_author}),
+                        "data": json.dumps({"turn_id": turn_id, "agent": display_author}),
                     }
 
                 # Emit tool calls
@@ -722,7 +737,7 @@ async def ask_question(request: Request, body: AskRequest):
                                 safe_args[k] = str(v)[:100]
                     yield {
                         "event": "tool_call",
-                        "data": json.dumps({"agent": display_author, "tool": fc_name, "args": safe_args}),
+                        "data": json.dumps({"turn_id": turn_id, "agent": display_author, "tool": fc_name, "args": safe_args}),
                     }
 
                 # Emit tool done
@@ -731,7 +746,7 @@ async def ask_question(request: Request, body: AskRequest):
                     fr_name = getattr(fr, "name", "")
                     yield {
                         "event": "tool_done",
-                        "data": json.dumps({"agent": display_author, "tool": fr_name}),
+                        "data": json.dumps({"turn_id": turn_id, "agent": display_author, "tool": fr_name}),
                     }
 
                 # Handle text output / streaming chunks
@@ -748,7 +763,7 @@ async def ask_question(request: Request, body: AskRequest):
                         clean_text = re.sub(r"^\s*Verified from code:\s*", "", clean_text, flags=re.IGNORECASE).strip()
                     yield {
                         "event": "answer",
-                        "data": json.dumps({"agent": last_author, "text": clean_text}),
+                        "data": json.dumps({"turn_id": turn_id, "agent": last_author, "text": clean_text}),
                     }
 
             # Final answer check
@@ -758,28 +773,96 @@ async def ask_question(request: Request, body: AskRequest):
                     clean_text = re.sub(r"^\s*Verified from code:\s*", "", clean_text, flags=re.IGNORECASE).strip()
                 yield {
                     "event": "answer",
-                    "data": json.dumps({"agent": last_author, "text": clean_text}),
+                    "data": json.dumps({"turn_id": turn_id, "agent": last_author, "text": clean_text}),
                 }
 
             # Citations
             citations = extract_citations(final_answer, root)
+
+            # Determine verdict
+            from code_helper.tools._final_struct_registry import get_and_clear_final_struct
+            sess_obj = await _session_service.get_session(app_name="code_helper", user_id="user", session_id=session_id)
+            if not captured_struct and sess_obj and hasattr(sess_obj, "state") and sess_obj.state:
+                captured_struct = sess_obj.state.pop("temp:final_struct", None)
+                sess_obj.state.pop("temp:final_text", None)
+            if not captured_struct:
+                captured_struct = get_and_clear_final_struct(session_id)
+
+            if captured_struct and isinstance(captured_struct, dict) and "kind" in captured_struct:
+                verdict_kind = captured_struct["kind"]
+                yield {
+                    "event": "verdict",
+                    "data": json.dumps({
+                        "turn_id": turn_id,
+                        "agent": last_author,
+                        "kind": verdict_kind,
+                        "data": captured_struct,
+                    }),
+                }
+            elif "could not find" in final_answer.lower() or "not found" in final_answer.lower():
+                searches_tried = []
+                searches_match = re.search(r"searches tried:\s*(.*)", final_answer, flags=re.IGNORECASE | re.DOTALL)
+                clean_msg = final_answer
+                if searches_match:
+                    clean_msg = final_answer[:searches_match.start()].strip()
+                    raw_searches = searches_match.group(1).strip()
+                    searches_tried = [s.strip(" -•*") for s in raw_searches.splitlines() if s.strip()]
+                clean_msg = re.sub(r"^\s*Verified from code:\s*", "", clean_msg, flags=re.IGNORECASE).strip()
+                yield {
+                    "event": "verdict",
+                    "data": json.dumps({
+                        "turn_id": turn_id,
+                        "agent": last_author,
+                        "kind": "not_found",
+                        "data": {
+                            "message": clean_msg,
+                            "searches_tried": searches_tried,
+                        },
+                    }),
+                }
+            else:
+                sources_list = []
+                clean_text = final_answer
+                src_match = re.search(r"\n*Sources(?:\s*\(from tool results\))?:\s*(.*)", final_answer, flags=re.IGNORECASE | re.DOTALL)
+                if src_match:
+                    clean_text = final_answer[:src_match.start()].strip()
+                    raw_sources = src_match.group(1).strip()
+                    sources_list = [s.strip(" -•*") for s in raw_sources.splitlines() if s.strip()]
+                clean_text = re.sub(r"^\s*Verified from code:\s*", "", clean_text, flags=re.IGNORECASE).strip()
+                yield {
+                    "event": "verdict",
+                    "data": json.dumps({
+                        "turn_id": turn_id,
+                        "agent": last_author,
+                        "kind": "text",
+                        "data": {
+                            "text": clean_text,
+                            "citations": citations,
+                            "sources": sources_list,
+                        },
+                        "text": clean_text,
+                        "citations": citations,
+                        "sources": sources_list,
+                    }),
+                }
+
             yield {
                 "event": "citations",
-                "data": json.dumps({"items": citations}),
+                "data": json.dumps({"turn_id": turn_id, "items": citations}),
             }
 
             # Done
             elapsed = round(time.time() - t_start, 2)
             yield {
                 "event": "done",
-                "data": json.dumps({"seconds": elapsed}),
+                "data": json.dumps({"turn_id": turn_id, "seconds": elapsed}),
             }
 
         except Exception as ex:
             print("Error in ask_question event_generator:", ex)
             yield {
                 "event": "error",
-                "data": json.dumps({"message": "The AI service is slow or busy. Try again.", "code": "busy"}),
+                "data": json.dumps({"turn_id": turn_id, "message": "The AI service is slow or busy. Try again.", "code": "busy"}),
             }
 
     return EventSourceResponse(event_generator())

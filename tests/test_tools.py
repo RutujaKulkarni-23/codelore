@@ -703,5 +703,61 @@ def test_after_model_callback_removes_verified_label():
     assert "Verified from code: Found the symbol at line 42." in normal_response.content.parts[0].text
 
 
+def test_show_file_outline_final_struct_query_pipeline():
+    from code_helper.tools.explain_tools import show_file_outline
+    from types import SimpleNamespace
+
+    mock_ctx = SimpleNamespace(state={}, actions=SimpleNamespace(skip_summarization=False))
+    text = show_file_outline("query_pipeline.py", tool_context=mock_ctx)
+    assert "COPY-READY OUTLINE:" in text
+
+    # Verify temp:final_struct
+    final_struct = mock_ctx.state.get("temp:final_struct")
+    assert final_struct is not None
+    assert final_struct["kind"] == "outline"
+    assert final_struct["path"] == "query_pipeline.py"
+
+    items = final_struct["items"]
+    # query_pipeline.py contains exactly 6 functions
+    assert len(items) == 6
+
+    names_and_ranges = [(it["name"], it["start"], it["end"]) for it in items]
+    expected_ranges = [
+        ("embed_query", 27, 86),
+        ("retrieve_top_k", 89, 126),
+        ("build_prompt_with_context", 129, 176),
+        ("generate_answer", 179, 240),
+        ("generate_answer_without_rag", 243, 309),
+        ("run_query_pipeline", 312, 358),
+    ]
+    assert names_and_ranges == expected_ranges
+    for it in items:
+        assert "signature" in it
+        assert "doc" in it
+
+
+def test_analyze_imports_final_struct_upsert_to_vector_db():
+    from code_helper.tools.architecture_tools import analyze_imports
+    from types import SimpleNamespace
+
+    mock_ctx = SimpleNamespace(state={}, actions=SimpleNamespace(skip_summarization=False))
+    text = analyze_imports("upsert_to_vector_db", tool_context=mock_ctx)
+    assert "indexer.py:27" in text
+
+    final_struct = mock_ctx.state.get("temp:final_struct")
+    assert final_struct is not None
+    assert final_struct["kind"] == "imports"
+    assert final_struct["target"] == "upsert_to_vector_db"
+    assert final_struct["defined_in"] in ("vector_store.py", "vector_store")
+
+    importers = final_struct["importers"]
+    assert len(importers) >= 1
+    importer_indexer = next((imp for imp in importers if imp["path"] == "indexer.py"), None)
+    assert importer_indexer is not None
+    assert importer_indexer["line"] == 27
+    assert "upsert_to_vector_db" in importer_indexer["statement"]
+
+
+
 
 

@@ -60,6 +60,7 @@ def _parse_and_outline_file(path: str) -> tuple[str, int, str, list[str], list[s
     definitions: list[str] = []
     copy_ready_lines: list[str] = []
     symbol_ranges: dict[str, str] = {}
+    struct_items: list[dict[str, Any]] = []
 
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
@@ -71,11 +72,19 @@ def _parse_and_outline_file(path: str) -> tuple[str, int, str, list[str], list[s
 
             bases_str = ", ".join(ast.unparse(b) for b in node.bases)
             copy_ready_lines.append(f"{node.name}({bases_str}) - {path}:{c_start}-{c_end}")
+            c_first_doc = ""
             if c_doc:
                 c_first_doc = next((line.strip() for line in c_doc.splitlines() if line.strip()), "")
                 if c_first_doc:
                     copy_ready_lines.append(f"    {c_first_doc[:120]}")
             symbol_ranges[node.name] = f"{path}:{c_start}-{c_end}"
+            struct_items.append({
+                "name": node.name,
+                "signature": f"({bases_str})" if bases_str else "()",
+                "start": c_start,
+                "end": c_end,
+                "doc": c_first_doc[:120],
+            })
 
             # Methods
             for item in node.body:
@@ -88,13 +97,22 @@ def _parse_and_outline_file(path: str) -> tuple[str, int, str, list[str], list[s
                     definitions.append(f"    • {kind_str} {item.name}() -> {path}:{m_start}-{m_end}{m_doc_first}")
 
                     m_params = ast.unparse(item.args)
+                    m_ret = f" -> {ast.unparse(item.returns)}" if getattr(item, "returns", None) else ""
                     copy_ready_lines.append(f"{node.name}.{item.name}({m_params}) - {path}:{m_start}-{m_end}")
+                    m_first_doc = ""
                     if m_doc:
                         m_first_doc = next((line.strip() for line in m_doc.splitlines() if line.strip()), "")
                         if m_first_doc:
                             copy_ready_lines.append(f"    {m_first_doc[:120]}")
                     symbol_ranges[f"{node.name}.{item.name}"] = f"{path}:{m_start}-{m_end}"
                     symbol_ranges[item.name] = f"{path}:{m_start}-{m_end}"
+                    struct_items.append({
+                        "name": f"{node.name}.{item.name}",
+                        "signature": f"({m_params}){m_ret}",
+                        "start": m_start,
+                        "end": m_end,
+                        "doc": m_first_doc[:120],
+                    })
 
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             f_doc = ast.get_docstring(node)
@@ -105,14 +123,23 @@ def _parse_and_outline_file(path: str) -> tuple[str, int, str, list[str], list[s
             definitions.append(f"Function: {kind_str} {node.name}() -> {path}:{f_start}-{f_end}{f_doc_first}")
 
             f_params = ast.unparse(node.args)
+            f_ret = f" -> {ast.unparse(node.returns)}" if getattr(node, "returns", None) else ""
             copy_ready_lines.append(f"{node.name}({f_params}) - {path}:{f_start}-{f_end}")
+            f_first_doc = ""
             if f_doc:
                 f_first_doc = next((line.strip() for line in f_doc.splitlines() if line.strip()), "")
                 if f_first_doc:
                     copy_ready_lines.append(f"    {f_first_doc[:120]}")
             symbol_ranges[node.name] = f"{path}:{f_start}-{f_end}"
+            struct_items.append({
+                "name": node.name,
+                "signature": f"({f_params}){f_ret}",
+                "start": f_start,
+                "end": f_end,
+                "doc": f_first_doc[:120],
+            })
 
-    return path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges
+    return path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges, struct_items
 
 
 def get_file_outline(path: str, tool_context: Any = None) -> str:
@@ -120,7 +147,7 @@ def get_file_outline(path: str, tool_context: Any = None) -> str:
     res = _parse_and_outline_file(path)
     if isinstance(res, str):
         return res
-    f_path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges = res
+    f_path, total_lines, first_doc_line, import_entries, definitions, copy_ready_lines, symbol_ranges, *rest = res
 
     if tool_context is not None and hasattr(tool_context, "state"):
         try:
@@ -168,10 +195,11 @@ def get_file_outline(path: str, tool_context: Any = None) -> str:
 
 def show_file_outline(path: str, tool_context: Any = None) -> str:
     """Use this when the user asks for an outline, structure or list of the functions/classes of ONE file. Its output is shown to the user as is."""
+    from code_helper.tools._final_struct_registry import set_last_final_struct
     res = _parse_and_outline_file(path)
     if isinstance(res, str):
         return res
-    _, _, _, _, _, copy_ready_lines, _ = res
+    _, _, _, _, _, copy_ready_lines, _, struct_items = res
 
     lines = ["COPY-READY OUTLINE:"]
     if copy_ready_lines:
@@ -180,12 +208,18 @@ def show_file_outline(path: str, tool_context: Any = None) -> str:
         lines.append("<no classes or functions defined>")
 
     output_text = cap_output("\n".join(lines))
+    final_struct = {
+        "kind": "outline",
+        "path": path,
+        "items": struct_items,
+    }
 
     if tool_context is not None:
         state_write_ok = False
         if hasattr(tool_context, "state") and tool_context.state is not None:
             try:
                 tool_context.state["temp:final_text"] = output_text
+                tool_context.state["temp:final_struct"] = final_struct
                 state_write_ok = True
             except Exception:
                 state_write_ok = False
@@ -195,4 +229,5 @@ def show_file_outline(path: str, tool_context: Any = None) -> str:
             except Exception:
                 pass
 
+    set_last_final_struct(final_struct)
     return output_text

@@ -6,18 +6,18 @@ import { MascotBubble } from "../components/MascotBubble";
 import {
   CheckCircle2,
   ArrowRight,
-  ShieldCheck,
   Search,
-  ExternalLink,
   Square,
   AlertTriangle,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { streamAsk, fetchProject, BACKEND_OFFLINE_MSG } from "../api";
 import type { ProjectResponse } from "../api";
 import { sseReducer, initialCaseState } from "../lib/sseReducer";
-import { splitTextWithCitations } from "../lib/citations";
 import { saveRecentCase, getCaseById } from "../lib/storage";
+import { StructuredVerdictCard } from "../components/StructuredVerdictCard";
 
 function formatCaseNumber(id: string): string {
   if (id.startsWith("#") && id.length <= 6) return id.toUpperCase();
@@ -46,7 +46,20 @@ export const CaseViewPage: React.FC = () => {
   const [highlightRange, setHighlightRange] = useState<{ start: number; end: number } | undefined>(undefined);
 
   const [state, dispatch] = useReducer(sseReducer, initialCaseState);
+  const [expandedTurnIds, setExpandedTurnIds] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const toggleExpandTurn = (turnId: string) => {
+    setExpandedTurnIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(turnId)) {
+        next.delete(turnId);
+      } else {
+        next.add(turnId);
+      }
+      return next;
+    });
+  };
 
   // Fetch project files for left panel
   useEffect(() => {
@@ -80,6 +93,7 @@ export const CaseViewPage: React.FC = () => {
       if (saved) {
         setCurrentQuestion(saved.question);
         if (saved.answer) {
+          dispatch({ type: "start", data: { question: saved.question } });
           if (saved.agent) {
             dispatch({ type: "routed", data: { agent: saved.agent } });
           }
@@ -193,13 +207,6 @@ export const CaseViewPage: React.FC = () => {
       : state.answer
       ? "SOLVED"
       : "READY";
-
-  const agentColor =
-    state.activeAgent === "Code Searcher" ? "#60a5fa" :
-    state.activeAgent === "Code Explainer" ? "#f0abfc" :
-    state.activeAgent === "Architecture Mapper" ? "#a78bfa" :
-    state.activeAgent === "Onboarding Guide" ? "#fbbf24" :
-    "#22d3ee";
 
   return (
     <div className="min-h-screen flex flex-col bg-[#03111f] text-[#e6f6ff]">
@@ -345,120 +352,178 @@ export const CaseViewPage: React.FC = () => {
               </div>
             )}
 
-            {/* User Question Bubble */}
-            {currentQuestion && (
-              <div className="flex justify-end">
-                <div className="max-w-xl p-4 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-white font-medium text-sm shadow-md">
-                  {currentQuestion}
-                </div>
-              </div>
-            )}
-
-            {/* Live Investigation Timeline */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400/80 font-semibold block mb-2">
-                INVESTIGATION TIMELINE
-              </span>
-
-              {state.timeline.length === 0 && state.status === "idle" && !currentQuestion && (
-                <p className="text-xs text-[#9fc3d6]/60 italic font-mono p-3 bg-[#020b14]/40 rounded-xl border border-cyan-900/30">
-                  Ready to investigate. Type a question below or pick a suggested lead.
-                </p>
-              )}
-
-              {state.status === "investigating" && state.timeline.length === 0 && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-[#020b14]/70 border border-cyan-500/40 text-xs font-mono">
-                  <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                  <div className="flex-1">
-                    <span className="font-bold text-white pr-2">Boss:</span>
-                    <span className="text-cyan-300">Reading question and routing to specialist…</span>
+            {state.turns.length === 0 ? (
+              <>
+                {currentQuestion && (
+                  <div className="flex justify-end">
+                    <div className="max-w-xl p-4 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-white font-medium text-sm shadow-md">
+                      {currentQuestion}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {currentQuestion && !state.answer && state.status !== "investigating" && state.timeline.length === 0 && (
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs font-mono">
-                  <span className="text-cyan-200">Case lead ready for investigation</span>
-                  <button
-                    onClick={() => runInvestigation(currentQuestion, state.sessionId || undefined)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold transition shadow-sm"
-                  >
-                    <span>Investigate now</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-
-              {state.timeline.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[#020b14]/70 border border-cyan-900/40 text-xs font-mono"
-                >
-                  {item.status === "running" ? (
-                    <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  )}
-                  <div className="flex-1">
-                    <span className="font-bold text-white pr-2">{item.agent}:</span>
-                    <span className="text-cyan-300">{item.title}</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    {item.detail || "verified"}
+                )}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400/80 font-semibold block mb-2">
+                    INVESTIGATION TIMELINE
                   </span>
+                  <p className="text-xs text-[#9fc3d6]/60 italic font-mono p-3 bg-[#020b14]/40 rounded-xl border border-cyan-900/30">
+                    Ready to investigate. Type a question below or pick a suggested lead.
+                  </p>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              state.turns.map((turn, turnIdx) => {
+                const isCurrentTurn = turnIdx === state.turns.length - 1;
+                const isExpanded = isCurrentTurn || expandedTurnIds.has(turn.turn_id);
+                const turnAgent = turn.activeAgent || (turn.verdict && turn.verdict.agent) || "Specialist";
+                const durText = turn.stats.durationSeconds ? `${turn.stats.durationSeconds} s` : "completed";
+                const evidenceCount = turn.citations.length || turn.stats.evidenceCount || 0;
+                const shortQ = turn.question.length > 60 ? `${turn.question.slice(0, 57)}…` : turn.question;
 
-            {/* Verdict Card */}
-            {state.answer && (
-              <div
-                className={`p-5 rounded-2xl border transition shadow-xl ${
-                  isColdCase
-                    ? "bg-amber-950/40 border-amber-500/40"
-                    : "bg-[#031526]/80 border-cyan-500/40"
-                }`}
-              >
-                {/* Agent Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-cyan-900/40 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="px-2 py-0.5 rounded font-mono font-bold text-xs"
-                      style={{ backgroundColor: `${agentColor}33`, color: agentColor }}
+                if (!isExpanded) {
+                  return (
+                    <div
+                      key={turn.turn_id}
+                      onClick={() => toggleExpandTurn(turn.turn_id)}
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#020b14]/60 hover:bg-[#031526]/80 border border-cyan-900/40 hover:border-cyan-500/40 text-xs font-mono cursor-pointer transition select-none group"
+                      title="Click to expand previous turn"
                     >
-                      {state.activeAgent || "Specialist"}
-                    </span>
-                    <span className="text-xs text-emerald-400 font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      {isColdCase ? "Cold case — not in code" : "Verified from code"}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    {state.durationSeconds ? `answered in ${state.durationSeconds}s` : "completed"}
-                  </span>
-                </div>
+                      <div className="flex items-center gap-2 truncate flex-1 mr-3">
+                        <span className="text-cyan-300 font-semibold truncate">
+                          Q: {shortQ}
+                        </span>
+                        <span className="text-cyan-800">·</span>
+                        <span className="text-cyan-400 font-medium whitespace-nowrap">
+                          {turnAgent}
+                        </span>
+                        <span className="text-cyan-800">·</span>
+                        <span className="text-slate-400 whitespace-nowrap">
+                          {durText}
+                        </span>
+                        <span className="text-cyan-800">·</span>
+                        <span className="text-emerald-400 whitespace-nowrap">
+                          {evidenceCount} evidence
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-cyan-400 group-hover:text-cyan-300 text-xs flex-shrink-0">
+                        <span className="text-[11px] font-mono text-cyan-500/70">Expand</span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  );
+                }
 
-                {/* Verdict Text with Clickable Evidence Chips */}
-                <div className="text-sm leading-relaxed text-[#e6f6ff] space-y-3 font-body">
-                  {splitTextWithCitations(state.answer).map((seg, idx) => {
-                    if (seg.type === "citation" && seg.citation) {
-                      const { file, start, end, raw } = seg.citation;
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => handleCitationClick(file, start, end)}
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 mx-1 rounded-full bg-cyan-950 border border-cyan-400/50 hover:bg-cyan-500/20 text-cyan-300 font-mono text-xs font-semibold tracking-wide transition shadow-sm hover:scale-105 active:scale-95"
-                          title={`Jump to ${file} lines ${start}–${end}`}
-                        >
-                          <span>{raw}</span>
-                          <ExternalLink className="w-3 h-3 text-cyan-400" />
-                        </button>
-                      );
-                    }
-                    return <span key={idx}>{seg.content}</span>;
-                  })}
-                </div>
-              </div>
+                return (
+                  <div key={turn.turn_id} className="space-y-4 pt-2">
+                    {!isCurrentTurn && (
+                      <div
+                        onClick={() => toggleExpandTurn(turn.turn_id)}
+                        className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-cyan-950/40 border border-cyan-800/30 text-[11px] font-mono text-cyan-400/80 cursor-pointer hover:bg-cyan-950/60 transition"
+                      >
+                        <span className="font-semibold uppercase tracking-wider">Earlier Question ({turnIdx + 1})</span>
+                        <div className="flex items-center gap-1">
+                          <span>Collapse</span>
+                          <ChevronUp className="w-3 h-3" />
+                        </div>
+                      </div>
+                    )}
+
+                    {turn.question && (
+                      <div className="flex justify-end">
+                        <div className="max-w-xl p-4 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-white font-medium text-sm shadow-md">
+                          {turn.question}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400/80 font-semibold block mb-2">
+                        INVESTIGATION TIMELINE
+                      </span>
+
+                      {turn.status === "investigating" && turn.timeline.length === 0 && (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#020b14]/70 border border-cyan-500/40 text-xs font-mono">
+                          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                          <div className="flex-1">
+                            <span className="font-bold text-white pr-2">Boss:</span>
+                            <span className="text-cyan-300">Reading question and routing to specialist…</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {turn.timeline.map((item) => {
+                        const isBossTransfer = item.title.startsWith("Boss chose");
+                        const isTookCase = item.title.includes("took the case");
+                        const showDirect = isBossTransfer || isTookCase;
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-3 p-3 rounded-xl bg-[#020b14]/70 border border-cyan-900/40 text-xs font-mono"
+                          >
+                            {item.status === "running" ? (
+                              <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 truncate">
+                              {!showDirect && <span className="font-bold text-white pr-2">{item.agent}:</span>}
+                              <span className="text-cyan-300">{item.title}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono flex-shrink-0">
+                              {item.duration !== undefined && (
+                                <span className="text-cyan-400/80">{item.duration}s</span>
+                              )}
+                              {item.detail && (
+                                <span className={item.detail === "Verified from code" ? "text-emerald-400/90 font-semibold" : "text-slate-400"}>
+                                  {item.detail}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {(turn.status === "error" || turn.status === "rate_limited") && (
+                      <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/50 text-[#e6f6ff] space-y-2">
+                        <div className="flex items-center gap-2 text-amber-300 font-heading font-bold text-sm">
+                          <AlertTriangle className="w-4 h-4 text-amber-400" />
+                          <span>
+                            {turn.status === "rate_limited" || turn.errorCode === 429
+                              ? "Rate limit reached — Lore needs a quick breather"
+                              : turn.errorCode === "timeout"
+                              ? "Investigation timed out"
+                              : "Investigation Interrupted"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#9fc3d6] leading-relaxed">
+                          {turn.errorMessage || "The AI specialist encountered an issue."}
+                        </p>
+                      </div>
+                    )}
+
+                    {turn.verdict ? (
+                      <StructuredVerdictCard
+                        verdict={turn.verdict}
+                        onCitationClick={handleCitationClick}
+                        activeAgent={turn.activeAgent || turn.verdict.agent || undefined}
+                        durationSeconds={turn.stats.durationSeconds}
+                      />
+                    ) : turn.answer ? (
+                      <StructuredVerdictCard
+                        verdict={{
+                          kind: "text",
+                          data: { text: turn.answer },
+                          text: turn.answer,
+                          citations: turn.citations,
+                        }}
+                        onCitationClick={handleCitationClick}
+                        activeAgent={turn.activeAgent || undefined}
+                        durationSeconds={turn.stats.durationSeconds}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })
             )}
           </div>
 

@@ -10,13 +10,18 @@ from code_helper.rag.secrets_mask import mask_secrets
 
 
 
-def _safe_store_final_text(tool_context: Any, output_text: str) -> None:
+def _safe_store_final_text(tool_context: Any, output_text: str, final_struct: dict[str, Any] | None = None) -> None:
     """Safely stores output_text in temp:final_text state and sets skip_summarization."""
+    if final_struct:
+        from code_helper.tools._final_struct_registry import set_last_final_struct
+        set_last_final_struct(final_struct)
     if tool_context is not None:
         state_write_ok = False
         if hasattr(tool_context, "state") and tool_context.state is not None:
             try:
                 tool_context.state["temp:final_text"] = output_text
+                if final_struct:
+                    tool_context.state["temp:final_struct"] = final_struct
                 state_write_ok = True
             except Exception:
                 state_write_ok = False
@@ -195,6 +200,7 @@ def get_project_overview(tool_context: Any = None) -> str:
     if chosen_entry and chosen_entry not in reading_order and chosen_entry in scan_res.files:
         reading_order.append(chosen_entry)
 
+    reading_order_struct: list[dict[str, Any]] = []
     for idx, f in enumerate(reading_order, 1):
         f_doc_line = ""
         full_f = root / f
@@ -218,6 +224,8 @@ def get_project_overview(tool_context: Any = None) -> str:
             pass
 
         lines.append(f"  {idx}. {f}{f_doc_line}")
+        clean_doc = f_doc_line.lstrip(" - ").strip()
+        reading_order_struct.append({"path": f, "doc": clean_doc})
     lines.append("")
 
     # Section 5: Other files
@@ -229,7 +237,23 @@ def get_project_overview(tool_context: Any = None) -> str:
     lines.append(f"  - Dependency files: {dep_str}")
     lines.append(f"  - Documentation: {doc_str}")
 
+    commands_struct = list(how_to_run_flags)
+    if not commands_struct and chosen_entry:
+        commands_struct.append(f"python {chosen_entry}")
+
+    final_struct = {
+        "kind": "overview",
+        "entry_point": chosen_entry,
+        "also_runnable": also_runnable,
+        "commands": commands_struct,
+        "stages": stages,
+        "reading_order": reading_order_struct,
+        "data_files": data_files,
+        "dependency_files": dep_files,
+        "docs": doc_files,
+    }
+
     output_text = cap_output("\n".join(lines))
-    _safe_store_final_text(tool_context, output_text)
+    _safe_store_final_text(tool_context, output_text, final_struct)
     return output_text
 
