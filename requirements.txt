@@ -1,0 +1,6 @@
+google-adk==2.12.0
+litellm==1.105.1
+openai==2.54.0
+pinecone==10.0.0
+python-dotenv==1.2.4
+pytest==9.1.1
