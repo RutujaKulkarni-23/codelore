@@ -1,0 +1,44 @@
+flowchart TB
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    subgraph BrowserProcess ["Browser Runtime (Client)"]
+        UI[React 19 SPA Vite]:::searcher
+        Flow[React Flow @xyflow/react]:::mapper
+        State[CaseState Reducer]:::searcher
+    end
+
+    subgraph ServerProcess ["FastAPI Backend Process (server/app.py)"]
+        FastAPIApp[FastAPI REST & SSE Server]:::boss
+        Limiter[In-Memory IP Rate Limiter]:::external
+        Runner[ADK Runner & SessionService]:::boss
+        AgentTeam[ADK Agent Team: 1 Boss + 4 Workers]:::explainer
+        ToolRegistry[Native Python AST Tools]:::mapper
+    end
+
+    subgraph SubprocessMCP ["Isolated Subprocess (Node.js)"]
+        MCPNode[mcp-server-filesystem @1.0.0]:::external
+    end
+
+    subgraph CloudAndDisk ["Data Stores & Cloud APIs"]
+        PineconeStore[(Pinecone Vector DB)]:::datastore
+        NvidiaNIM[NVIDIA NIM Inference]:::external
+        FileSystem[(Target Project Files)]:::datastore
+    end
+
+    UI -->|SSE POST /api/ask| FastAPIApp
+    UI -->|GET /api/project, /api/graph, /api/file| FastAPIApp
+    FastAPIApp --> Limiter
+    Limiter --> Runner
+    Runner --> AgentTeam
+    AgentTeam --> ToolRegistry
+    AgentTeam -->|Stdio JSON-RPC| MCPNode
+    ToolRegistry --> FileSystem
+    MCPNode --> FileSystem
+    ToolRegistry --> PineconeStore
+    AgentTeam -->|LiteLLM Proxy| NvidiaNIM

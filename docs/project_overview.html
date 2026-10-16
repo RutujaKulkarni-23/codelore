@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeLore — Multi-Agent Code Intelligence Visual Architecture & Systems Guide</title>
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --bg-card: #0d121d;
+      --bg-card-hover: #131b2e;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #1a2234;
+      --border: #1e293b;
+      --border-accent: #334155;
+      
+      --cyan: #22d3ee;
+      --cyan-glow: rgba(34, 211, 238, 0.15);
+      --violet: #a78bfa;
+      --violet-bright: #8b5cf6;
+      --violet-glow: rgba(139, 92, 246, 0.18);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.15);
+      --amber: #f59e0b;
+      --amber-glow: rgba(245, 158, 11, 0.15);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.15);
+      
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --code-bg: #090d16;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 80px;
+    }
+
+    /* Header & Navigation */
+    header {
+      background: linear-gradient(180deg, rgba(13, 18, 29, 0.95) 0%, rgba(7, 9, 14, 0.9) 100%);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .nav-container {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+    }
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--violet-bright) 100%);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #07090e;
+      box-shadow: 0 0 16px var(--violet-glow);
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      display: block;
+    }
+
+    nav.quick-nav {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      max-width: 100%;
+      padding-bottom: 4px;
+    }
+    nav.quick-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    nav.quick-nav a:hover {
+      color: var(--text-main);
+      background: var(--bg-surface);
+      border-color: var(--border-accent);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 60px 0 40px;
+      text-align: center;
+      position: relative;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 250px;
+      background: radial-gradient(circle, var(--violet-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 54px);
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.15;
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, #ffffff 30%, var(--cyan) 75%, var(--violet) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p.lead {
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--text-muted);
+      max-width: 820px;
+      margin: 0 auto 30px;
+      font-weight: 400;
+    }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      max-width: 950px;
+      margin: 30px auto 0;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: left;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover {
+      border-color: var(--border-accent);
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .stat-val span.sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* Section Headers */
+    .section-head {
+      margin: 60px 0 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+    }
+    .section-head-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-head-title h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .section-num {
+      background: var(--bg-surface-elevated);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-accent);
+    }
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 14px;
+      max-width: 700px;
+    }
+
+    /* Status Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .badge::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .badge-verified {
+      background: var(--emerald-glow);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge-verified::before { background: #34d399; box-shadow: 0 0 6px #34d399; }
+    
+    .badge-partial {
+      background: var(--amber-glow);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .badge-partial::before { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; }
+    
+    .badge-planned {
+      background: rgba(148, 163, 184, 0.1);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .badge-planned::before { background: #94a3b8; }
+    
+    .badge-blocked {
+      background: var(--rose-glow);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.4);
+    }
+    .badge-blocked::before { background: #fb7185; box-shadow: 0 0 6px #fb7185; }
+
+    /* Cards & Grids */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: all 0.2s ease;
+    }
+    .card:hover {
+      border-color: var(--border-accent);
+    }
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+    }
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .agent-card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+    .agent-boss::after { background: var(--cyan); }
+    .agent-searcher::after { background: #60a5fa; }
+    .agent-explainer::after { background: #f472b6; }
+    .agent-mapper::after { background: var(--violet); }
+    .agent-guide::after { background: var(--amber); }
+
+    .agent-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .agent-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .agent-role {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .agent-body {
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-grow: 1;
+    }
+    .agent-prop {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .agent-prop-key {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      font-weight: 700;
+    }
+    .agent-prop-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-main);
+      background: var(--code-bg);
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: inline-block;
+    }
+    .agent-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-top: auto;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* Tables */
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg-card);
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+    thead {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      padding: 12px 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-main);
+      vertical-align: top;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.015);
+    }
+    code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--code-bg);
+      color: var(--cyan);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* SVG Diagrams Container */
+    .diagram-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: auto;
+    }
+    .diagram-container svg {
+      max-width: 100%;
+      height: auto;
+    }
+    .diagram-caption {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* Accordions & Details */
+    details {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    details:hover {
+      border-color: var(--border-accent);
+    }
+    details[open] {
+      border-color: var(--violet);
+    }
+    summary {
+      padding: 16px 20px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      color: var(--text-main);
+    }
+    summary::-webkit-details-marker {
+      display: none;
+    }
+    summary::after {
+      content: "+";
+      font-size: 18px;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+    details[open] summary::after {
+      content: "−";
+      color: var(--cyan);
+    }
+    .details-content {
+      padding: 0 20px 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      margin-top: 4px;
+      padding-top: 14px;
+    }
+
+    /* Code blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #e2e8f0;
+      overflow-x: auto;
+      margin: 10px 0;
+      line-height: 1.5;
+    }
+    .cmd-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* Testing Dashboard Grid */
+    .test-dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .metric-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .metric-num {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .metric-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 80px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero { padding: 40px 0 20px; }
+      .agent-grid { grid-template-columns: 1fr; }
+      .test-dashboard { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header>
+    <div class="nav-container">
+      <a href="#hero" class="brand">
+        <div class="brand-logo">CL</div>
+        <div>
+          <span class="brand-title">CodeLore</span>
+          <span class="brand-subtitle">Multi-Agent Code Intelligence</span>
+        </div>
+      </a>
+      <nav class="quick-nav">
+        <a href="#architecture">Architecture</a>
+        <a href="#agents">Agent Team</a>
+        <a href="#tools">Custom Tools</a>
+        <a href="#rag">RAG Pipeline</a>
+        <a href="#chunking">Chunking</a>
+        <a href="#mcp">Filesystem MCP</a>
+        <a href="#lifecycle">Request Lifecycle</a>
+        <a href="#testing">Test Dashboard</a>
+        <a href="#demo">Demo Plan</a>
+        <a href="#qa">Instructor Q&A</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero">
+      <div class="hero-content">
+        <div class="hero-badge">Multi-Agent Code Helper &bull; Academic Architecture Build</div>
+        <h1>Deterministic Multi-Agent Code Intelligence</h1>
+        <p class="lead">
+          An architectural showcase combining Google Agent Development Kit (ADK), AST static analysis, NVIDIA NIM vector embeddings, and sandboxed Filesystem MCP to deliver verifiable, line-grounded answers across Python codebases.
+        </p>
+
+        <div class="hero-stats">
+          <div class="stat-card">
+            <div class="stat-label">Offline Test Suite</div>
+            <div class="stat-val" style="color: #34d399;">86 Passed <span class="sub">/ 4 skipped</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Vector Retrieval Hit@5</div>
+            <div class="stat-val" style="color: var(--cyan);">100% <span class="sub">(10/10)</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Calibrated MIN_SCORE</div>
+            <div class="stat-val" style="color: var(--violet);">0.35 <span class="sub">Cosine</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Post-Fix Lookup Latency</div>
+            <div class="stat-val" style="color: #fbbf24;">1.68s <span class="sub">EVAL_02</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION B: System Architecture Map -->
+    <section id="architecture">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">01</span>
+          <h2>System Architecture Map</h2>
+        </div>
+        <div class="badge badge-verified">Verified Component Topology</div>
+      </div>
+
+      <div class="diagram-container">
+        <!-- Inline SVG Architecture Diagram -->
+        <svg viewBox="0 0 960 480" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background Grid Overlay -->
+          <defs>
+            <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#0891b2" stop-opacity="0.9"/>
+            </linearGradient>
+            <linearGradient id="violetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.9"/>
+            </linearGradient>
+            <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#34d399" stop-opacity="0.9"/>
+              <stop offset="100%" stop-color="#059669" stop-opacity="0.9"/>
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- Client Layer -->
+          <rect x="30" y="40" width="160" height="70" rx="10" fill="#0d121d" stroke="#1e293b" stroke-width="1.5"/>
+          <text x="110" y="70" fill="#f8fafc" font-size="14" font-weight="700" text-anchor="middle" font-family="sans-serif">Developer / UI</text>
+          <text x="110" y="90" fill="#64748b" font-size="11" text-anchor="middle" font-family="sans-serif">CLI &bull; Web &bull; SSE</text>
+
+          <!-- Router: Boss -->
+          <rect x="250" y="40" width="190" height="70" rx="10" fill="#0d121d" stroke="#22d3ee" stroke-width="2" filter="url(#glow)"/>
+          <text x="345" y="70" fill="#22d3ee" font-size="15" font-weight="800" text-anchor="middle" font-family="sans-serif">Boss Router</text>
+          <text x="345" y="90" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="sans-serif">root_agent &bull; Tools: NONE</text>
+
+          <!-- Connection: Client -> Boss -->
+          <path d="M 190 75 L 250 75" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- 4 Workers -->
+          <!-- Worker 1: Searcher -->
+          <rect x="510" y="20" width="190" height="60" rx="8" fill="#111827" stroke="#60a5fa" stroke-width="1.5"/>
+          <text x="605" y="45" fill="#60a5fa" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">code_searcher</text>
+          <text x="605" y="63" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">find_symbol, rag_search</text>
+
+          <!-- Worker 2: Explainer -->
+          <rect x="510" y="95" width="190" height="60" rx="8" fill="#111827" stroke="#f472b6" stroke-width="1.5"/>
+          <text x="605" y="120" fill="#f472b6" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">code_explainer</text>
+          <text x="605" y="138" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">outlines + Filesystem MCP</text>
+
+          <!-- Worker 3: Mapper -->
+          <rect x="510" y="170" width="190" height="60" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="605" y="195" fill="#a78bfa" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">architecture_mapper</text>
+          <text x="605" y="213" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">analyze_imports</text>
+
+          <!-- Worker 4: Guide -->
+          <rect x="510" y="245" width="190" height="60" rx="8" fill="#111827" stroke="#fbbf24" stroke-width="1.5"/>
+          <text x="605" y="270" fill="#fbbf24" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">onboarding_guide</text>
+          <text x="605" y="288" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">get_project_overview</text>
+
+          <!-- Connections: Boss -> Workers -->
+          <path d="M 440 60 C 475 60, 475 50, 510 50" stroke="#60a5fa" stroke-width="1.5" fill="none"/>
+          <path d="M 440 75 C 475 75, 475 125, 510 125" stroke="#f472b6" stroke-width="1.5" fill="none"/>
+          <path d="M 440 90 C 475 90, 475 200, 510 200" stroke="#a78bfa" stroke-width="1.5" fill="none"/>
+          <path d="M 440 100 C 475 100, 475 275, 510 275" stroke="#fbbf24" stroke-width="1.5" fill="none"/>
+
+          <!-- Tools / Subsystems Layer -->
+          <!-- AST Static Analysis Box -->
+          <rect x="760" y="20" width="170" height="135" rx="8" fill="#090d16" stroke="#334155" stroke-width="1.5"/>
+          <text x="845" y="42" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle" font-family="sans-serif">Python AST Engine</text>
+          <text x="845" y="62" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">find_symbol</text>
+          <text x="845" y="82" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">get_file_outline</text>
+          <text x="845" y="102" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">show_file_outline</text>
+          <text x="845" y="122" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">analyze_imports</text>
+          <text x="845" y="142" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">get_project_overview</text>
+
+          <!-- External MCP Filesystem -->
+          <rect x="760" y="175" width="170" height="70" rx="8" fill="#090d16" stroke="#f472b6" stroke-width="1.5"/>
+          <text x="845" y="198" fill="#f472b6" font-size="12" font-weight="700" text-anchor="middle" font-family="sans-serif">Filesystem MCP</text>
+          <text x="845" y="216" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="sans-serif">Node.js @1.0.0 (Stdio)</text>
+          <text x="845" y="232" fill="#64748b" font-size="9" text-anchor="middle" font-family="monospace">read_text_file</text>
+
+          <!-- Vector Database: Pinecone & NVIDIA -->
+          <rect x="760" y="265" width="170" height="75" rx="8" fill="#090d16" stroke="#34d399" stroke-width="1.5"/>
+          <text x="845" y="288" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle" font-family="sans-serif">Vector Engine (RAG)</text>
+          <text x="845" y="306" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="sans-serif">Pinecone (2048-dim Cosine)</text>
+          <text x="845" y="324" fill="#64748b" font-size="9" text-anchor="middle" font-family="monospace">nemotron-3-embed-1b</text>
+
+          <!-- Connections to Tools -->
+          <path d="M 700 40 L 760 40" stroke="#60a5fa" stroke-width="1.5"/>
+          <path d="M 700 65 C 730 65, 730 290, 760 290" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <path d="M 700 120 C 730 120, 730 80, 760 80" stroke="#f472b6" stroke-width="1.5"/>
+          <path d="M 700 135 C 730 135, 730 200, 760 200" stroke="#f472b6" stroke-width="1.5"/>
+          <path d="M 700 195 C 730 195, 730 120, 760 120" stroke="#a78bfa" stroke-width="1.5"/>
+          <path d="M 700 270 C 730 270, 730 140, 760 140" stroke="#fbbf24" stroke-width="1.5"/>
+
+          <!-- Target Repository Sandbox Layer (Read-Only) -->
+          <rect x="180" y="380" width="600" height="75" rx="10" fill="#0b1329" stroke="#10b981" stroke-width="2" stroke-dasharray="6,4"/>
+          <text x="480" y="410" fill="#34d399" font-size="15" font-weight="700" text-anchor="middle" font-family="sans-serif">&#128274; READ-ONLY TARGET REPOSITORY: targets/Naive_RAG</text>
+          <text x="480" y="432" fill="#94a3b8" font-size="12" text-anchor="middle" font-family="sans-serif">Zero execution allowed &bull; Pure AST parsing & text inspection &bull; Strict safe_resolve() path jail</text>
+
+          <path d="M 845 155 L 845 380" stroke="#334155" stroke-width="1.5" stroke-dasharray="4,4"/>
+          <path d="M 845 245 L 845 380" stroke="#f472b6" stroke-width="1.5" stroke-dasharray="4,4"/>
+        </svg>
+        <div class="diagram-caption">Figure 1: Verified runtime topology showing strict transfer separation from Boss, isolated worker tools, and the read-only sandbox boundary.</div>
+      </div>
+    </section>
+
+    <!-- SECTION C: Five Interactive Agent Cards -->
+    <section id="agents">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">02</span>
+          <h2>Five-Agent Team Architecture</h2>
+        </div>
+        <div class="badge badge-verified">5 / 5 Agents Implemented</div>
+      </div>
+
+      <div class="agent-grid">
+        <!-- Boss Agent Card -->
+        <div class="agent-card agent-boss">
+          <div class="agent-header">
+            <div>
+              <div class="agent-name">Boss Router</div>
+              <div class="agent-role">Root Router (root_agent)</div>
+            </div>
+            <span class="badge badge-verified">Verified</span>
+          </div>
+          <div class="agent-body">
+            <p>Evaluates natural language query intent and dispatches immediately to one specialist worker using ADK agent transfers. Writes zero conversational text and performs no code analysis directly.</p>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Available Tools</span>
+              <span class="agent-prop-val">NONE (Routing Only)</span>
+            </div>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Primary Tie-Break Principle</span>
+              <span style="font-size: 12px; color: var(--text-main);">Routes by <em>what data the worker has</em>, not by keywords. Explanations &rarr; Explainer; Lookups &rarr; Searcher.</span>
+            </div>
+          </div>
+          <div class="agent-footer">
+            Source: <a href="file:///d:/CodeLore/codelore/code_helper/agent.py#L184" style="color: var(--cyan); text-decoration: none;">code_helper/agent.py:184-196</a>
+          </div>
+        </div>
+
+        <!-- Code Searcher Card -->
+        <div class="agent-card agent-searcher">
+          <div class="agent-header">
+            <div>
+              <div class="agent-name">Code Searcher</div>
+              <div class="agent-role">Symbol & Semantic Retrieval</div>
+            </div>
+            <span class="badge badge-verified">Verified</span>
+          </div>
+          <div class="agent-body">
+            <p>Locates where functions, classes, variables, and concepts are defined or used across the target codebase using AST parsing and Pinecone vector search.</p>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Available Tools</span>
+              <span class="agent-prop-val">find_symbol, rag_search</span>
+            </div>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Execution Guard</span>
+              <span style="font-size: 12px; color: var(--text-main);">Bypasses LLM generation for exact lookups via <code>temp:final_text</code> state writing.</span>
+            </div>
+          </div>
+          <div class="agent-footer">
+            Source: <a href="file:///d:/CodeLore/codelore/code_helper/agent.py#L129" style="color: var(--cyan); text-decoration: none;">code_helper/agent.py:129-140</a>
+          </div>
+        </div>
+
+        <!-- Code Explainer Card -->
+        <div class="agent-card agent-explainer">
+          <div class="agent-header">
+            <div>
+              <div class="agent-name">Code Explainer</div>
+              <div class="agent-role">Outlines & Logic Analysis</div>
+            </div>
+            <span class="badge badge-verified">Verified</span>
+          </div>
+          <div class="agent-body">
+            <p>Generates copy-ready file outlines and step-by-step logic explanations. Inspects raw file contents via sandboxed Filesystem MCP and coordinates citations from AST line ranges.</p>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Available Tools</span>
+              <span class="agent-prop-val">get_file_outline, show_file_outline, MCP Filesystem</span>
+            </div>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Dual Operation Modes</span>
+              <span style="font-size: 12px; color: var(--text-main);">OUTLINE Mode (single outline call) vs. EXPLAIN Mode (outline + MCP read).</span>
+            </div>
+          </div>
+          <div class="agent-footer">
+            Source: <a href="file:///d:/CodeLore/codelore/code_helper/agent.py#L143" style="color: var(--cyan); text-decoration: none;">code_helper/agent.py:143-153</a>
+          </div>
+        </div>
+
+        <!-- Architecture Mapper Card -->
+        <div class="agent-card agent-mapper">
+          <div class="agent-header">
+            <div>
+              <div class="agent-name">Architecture Mapper</div>
+              <div class="agent-role">Dependency Topology</div>
+            </div>
+            <span class="badge badge-verified">Verified</span>
+          </div>
+          <div class="agent-body">
+            <p>Traces cross-file Python imports and package usages. Builds whole-project dependency graphs, categorizing dependencies into internal, standard library, and third-party.</p>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Available Tools</span>
+              <span class="agent-prop-val">analyze_imports</span>
+            </div>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Deterministic Path</span>
+              <span style="font-size: 12px; color: var(--text-main);">Outputs exact import lines (e.g. <code>indexer.py:27-27</code>) with skip_summarization enabled.</span>
+            </div>
+          </div>
+          <div class="agent-footer">
+            Source: <a href="file:///d:/CodeLore/codelore/code_helper/agent.py#L156" style="color: var(--cyan); text-decoration: none;">code_helper/agent.py:156-167</a>
+          </div>
+        </div>
+
+        <!-- Onboarding Guide Card -->
+        <div class="agent-card agent-guide">
+          <div class="agent-header">
+            <div>
+              <div class="agent-name">Onboarding Guide</div>
+              <div class="agent-role">Developer Quickstart & Entry</div>
+            </div>
+            <span class="badge badge-verified">Verified</span>
+          </div>
+          <div class="agent-body">
+            <p>Orients developers to project purpose, entry points, reading order, and CLI flags. Statically extracts <code>argparse</code> flags and verifies main execution guards.</p>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Available Tools</span>
+              <span class="agent-prop-val">get_project_overview</span>
+            </div>
+            <div class="agent-prop">
+              <span class="agent-prop-key">Off-Topic Guard</span>
+              <span style="font-size: 12px; color: var(--text-main);">Immediately refuses non-code questions (cooking, weather) without calling tools.</span>
+            </div>
+          </div>
+          <div class="agent-footer">
+            Source: <a href="file:///d:/CodeLore/codelore/code_helper/agent.py#L170" style="color: var(--cyan); text-decoration: none;">code_helper/agent.py:170-181</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION D: Custom Tools Comparison Table -->
+    <section id="tools">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">03</span>
+          <h2>Custom Tools Comparison</h2>
+        </div>
+        <div class="badge badge-verified">6 Custom Tools Built (Req: 5)</div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Tool Name</th>
+              <th>Assigned Worker</th>
+              <th>Type / Uses AI?</th>
+              <th>Inputs</th>
+              <th>Outputs</th>
+              <th>Source File</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>rag_search</code></td>
+              <td><code>code_searcher</code></td>
+              <td><span style="color: var(--cyan); font-weight: 600;">AI</span> (NVIDIA + Pinecone)</td>
+              <td><code>query: str, top_k: int = 5</code></td>
+              <td>Ranked code excerpts with line headers and cosine scores</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/search_tools.py#L34" style="color: var(--violet); text-decoration: none;">search_tools.py:34</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr>
+              <td><code>find_symbol</code></td>
+              <td><code>code_searcher</code></td>
+              <td><span style="color: var(--emerald); font-weight: 600;">Plain Python</span> (AST)</td>
+              <td><code>name: str, tool_context: Any</code></td>
+              <td>Exact definition line ranges, signatures, and docstrings</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/search_tools.py#L89" style="color: var(--violet); text-decoration: none;">search_tools.py:89</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr>
+              <td><code>get_file_outline</code></td>
+              <td><code>code_explainer</code></td>
+              <td><span style="color: var(--emerald); font-weight: 600;">Plain Python</span> (AST)</td>
+              <td><code>path: str, tool_context: Any</code></td>
+              <td>Symbol-to-line coordinate mappings for explainer footer</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/explain_tools.py#L145" style="color: var(--violet); text-decoration: none;">explain_tools.py:145</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr>
+              <td><code>show_file_outline</code></td>
+              <td><code>code_explainer</code></td>
+              <td><span style="color: var(--emerald); font-weight: 600;">Plain Python</span> (AST)</td>
+              <td><code>path: str, tool_context: Any</code></td>
+              <td>Deterministic copy-ready outline of all classes/functions</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/explain_tools.py#L196" style="color: var(--violet); text-decoration: none;">explain_tools.py:196</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr>
+              <td><code>analyze_imports</code></td>
+              <td><code>architecture_mapper</code></td>
+              <td><span style="color: var(--emerald); font-weight: 600;">Plain Python</span> (AST)</td>
+              <td><code>module_name: str, tool_context</code></td>
+              <td>Cross-file import graph (imported by, imports internal/stdlib/ext)</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/architecture_tools.py#L42" style="color: var(--violet); text-decoration: none;">architecture_tools.py:42</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr>
+              <td><code>get_project_overview</code></td>
+              <td><code>onboarding_guide</code></td>
+              <td><span style="color: var(--emerald); font-weight: 600;">Plain Python</span> (AST & Scan)</td>
+              <td><code>tool_context: Any</code></td>
+              <td>Verified entry points, runnable scripts, CLI flags, reading order</td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/tools/onboarding_tools.py#L35" style="color: var(--violet); text-decoration: none;">onboarding_tools.py:35</a></td>
+              <td><span class="badge badge-verified">Verified</span></td>
+            </tr>
+            <tr style="background: rgba(148, 163, 184, 0.03);">
+              <td><code>Filesystem MCP</code></td>
+              <td><code>code_explainer</code></td>
+              <td><span style="color: var(--rose); font-weight: 600;">External Process</span> (Node.js)</td>
+              <td>Stdio JSON-RPC protocol</td>
+              <td><code>read_text_file, list_dir, dir_tree, search, get_info</code></td>
+              <td><a href="file:///d:/CodeLore/codelore/code_helper/mcp_config.py" style="color: var(--violet); text-decoration: none;">mcp_config.py:13</a></td>
+              <td><span class="badge badge-verified">External Protocol</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size: 12px; color: var(--text-dim); margin-top: -12px;">*Note: Filesystem MCP is integrated via Model Context Protocol and does not count toward the assignment's five custom Python tools requirement.</p>
+    </section>
+
+    <!-- SECTION E: Five-Stage RAG Pipeline -->
+    <section id="rag">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">04</span>
+          <h2>Five-Stage Custom RAG Pipeline</h2>
+        </div>
+        <div class="badge badge-verified">Verified Pipeline</div>
+      </div>
+
+      <div class="diagram-container">
+        <!-- RAG Pipeline Steps SVG -->
+        <svg viewBox="0 0 960 220" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+          <!-- Step 1: Scanner -->
+          <rect x="20" y="40" width="165" height="130" rx="8" fill="#111827" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="102" y="68" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">1. Scan & Filter</text>
+          <text x="102" y="88" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="monospace">scanner.py</text>
+          <text x="102" y="112" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Max files: 2,000</text>
+          <text x="102" y="128" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Max file: 200 KB</text>
+          <text x="102" y="146" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">Excludes .git/.venv</text>
+
+          <!-- Arrow 1 -> 2 -->
+          <path d="M 185 105 L 210 105" stroke="#334155" stroke-width="2"/>
+
+          <!-- Step 2: Chunker -->
+          <rect x="210" y="40" width="165" height="130" rx="8" fill="#111827" stroke="#818cf8" stroke-width="1.5"/>
+          <text x="292" y="68" fill="#818cf8" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">2. AST Chunking</text>
+          <text x="292" y="88" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="monospace">chunker.py</text>
+          <text x="292" y="112" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Strategy: ast_hybrid</text>
+          <text x="292" y="128" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Max: 60 lines / 3K chars</text>
+          <text x="292" y="146" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">8 lines overlap</text>
+
+          <!-- Arrow 2 -> 3 -->
+          <path d="M 375 105 L 400 105" stroke="#334155" stroke-width="2"/>
+
+          <!-- Step 3: Masker -->
+          <rect x="400" y="40" width="165" height="130" rx="8" fill="#111827" stroke="#f472b6" stroke-width="1.5"/>
+          <text x="482" y="68" fill="#f472b6" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">3. Mask Secrets</text>
+          <text x="482" y="88" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="monospace">secrets_mask.py</text>
+          <text x="482" y="112" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Regex Token Scrubbing</text>
+          <text x="482" y="128" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">pcsk_, nvapi-, sk-</text>
+          <text x="482" y="146" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">Zero Key Cloud Leaks</text>
+
+          <!-- Arrow 3 -> 4 -->
+          <path d="M 565 105 L 590 105" stroke="#334155" stroke-width="2"/>
+
+          <!-- Step 4: Embedder -->
+          <rect x="590" y="40" width="165" height="130" rx="8" fill="#111827" stroke="#a78bfa" stroke-width="1.5"/>
+          <text x="672" y="68" fill="#a78bfa" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">4. NVIDIA Embed</text>
+          <text x="672" y="88" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="monospace">embedder.py</text>
+          <text x="672" y="112" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">nemotron-3-embed-1b</text>
+          <text x="672" y="128" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">2048 Dimensions</text>
+          <text x="672" y="146" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">Batch size: 16</text>
+
+          <!-- Arrow 4 -> 5 -->
+          <path d="M 755 105 L 780 105" stroke="#334155" stroke-width="2"/>
+
+          <!-- Step 5: Vector Store -->
+          <rect x="780" y="40" width="160" height="130" rx="8" fill="#111827" stroke="#34d399" stroke-width="1.5"/>
+          <text x="860" y="68" fill="#34d399" font-size="13" font-weight="700" text-anchor="middle" font-family="sans-serif">5. Pinecone Store</text>
+          <text x="860" y="88" fill="#94a3b8" font-size="11" text-anchor="middle" font-family="monospace">vector_store.py</text>
+          <text x="860" y="112" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Serverless AWS</text>
+          <text x="860" y="128" fill="#64748b" font-size="10" text-anchor="middle" font-family="sans-serif">Cosine Similarity</text>
+          <text x="860" y="146" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">Namespace: naive-rag</text>
+        </svg>
+        <div class="diagram-caption">Figure 2: The five verified stages of the CodeLore codebase indexing pipeline executed via code_helper/index_codebase.py.</div>
+      </div>
+    </section>
+
+    <!-- SECTION F & G: Hybrid Retrieval vs Chunking -->
+    <section id="chunking">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">05</span>
+          <h2>AST-Hybrid Chunking & Retrieval Strategy</h2>
+        </div>
+        <div class="badge badge-verified">Chunking Verified</div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-main);">Function-Aware AST-Hybrid Chunking Mechanics</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Rather than slicing text blindly by fixed character windows, CodeLore uses Python AST to preserve complete grammatical functions and classes. Chunks only window when an individual function exceeds 60 lines or 3,000 characters.
+        </p>
+
+        <!-- Chunking Diagram -->
+        <div style="background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">
+          <div style="color: var(--cyan); margin-bottom: 8px;"># Source File: targets/Naive_RAG/query_pipeline.py (Total: 176 lines)</div>
+          
+          <div style="border-left: 3px solid var(--violet); padding-left: 12px; margin-bottom: 14px;">
+            <div style="color: #f8fafc; font-weight: 700;">Chunk 1: symbol="&lt;module&gt;" | Lines 1-25</div>
+            <div style="color: var(--text-dim); font-size: 11px;">Imports, type aliases, module docstrings &bull; kind: "module" &bull; Content hash: sha256(...)</div>
+          </div>
+
+          <div style="border-left: 3px solid #60a5fa; padding-left: 12px; margin-bottom: 14px;">
+            <div style="color: #f8fafc; font-weight: 700;">Chunk 2: symbol="embed_query" | Lines 27-86 (60 lines)</div>
+            <div style="color: var(--text-dim); font-size: 11px;">Complete function definition intact &bull; kind: "function" &bull; Citation: query_pipeline.py:27-86</div>
+          </div>
+
+          <div style="border-left: 3px solid #f472b6; padding-left: 12px; margin-bottom: 14px;">
+            <div style="color: #f8fafc; font-weight: 700;">Chunk 3: symbol="format_retrieved_context" | Lines 88-126 (39 lines)</div>
+            <div style="color: var(--text-dim); font-size: 11px;">Function definition intact &bull; kind: "function" &bull; Citation: query_pipeline.py:88-126</div>
+          </div>
+
+          <div style="border-left: 3px solid var(--emerald); padding-left: 12px;">
+            <div style="color: #f8fafc; font-weight: 700;">Chunk 4: symbol="build_prompt_with_context" | Lines 129-176 (48 lines)</div>
+            <div style="color: var(--text-dim); font-size: 11px;">Prompt formatting logic intact &bull; kind: "function" &bull; Citation: query_pipeline.py:129-176</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Planned Hybrid Retrieval Banner -->
+      <div class="card" style="border-left: 4px solid var(--amber);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h3 style="font-size: 16px; color: #fbbf24;">Planned Architecture: Hybrid Lexical + Semantic Retrieval (Phase 10)</h3>
+          <span class="badge badge-planned">Planned &bull; Not Implemented</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+          <strong>Important Architectural Distinction:</strong> CodeLore currently uses pure dense vector retrieval via Pinecone. True <em>Hybrid Retrieval</em> (converging sparse BM25 token matching and dense neural vectors via Reciprocal Rank Fusion) is designed for Phase 10 to eliminate semantic drift on absent technologies.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION I: Filesystem MCP Access Boundary -->
+    <section id="mcp">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">06</span>
+          <h2>Filesystem MCP Access Boundary</h2>
+        </div>
+        <div class="badge badge-verified">Sandboxed Subprocess</div>
+      </div>
+
+      <div class="diagram-container">
+        <!-- SVG MCP Sandbox Diagram -->
+        <svg viewBox="0 0 960 260" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+          <!-- Host Process Box -->
+          <rect x="30" y="30" width="340" height="200" rx="10" fill="#0d121d" stroke="#334155" stroke-width="1.5"/>
+          <text x="200" y="60" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle" font-family="sans-serif">Host Process: Python (Google ADK)</text>
+          
+          <rect x="50" y="80" width="300" height="40" rx="6" fill="#1e293b"/>
+          <text x="200" y="105" fill="#f43f5e" font-size="11" text-anchor="middle" font-family="monospace">NVIDIA_API_KEY, PINECONE_API_KEY</text>
+
+          <rect x="50" y="130" width="300" height="80" rx="6" fill="#111827" stroke="#334155"/>
+          <text x="200" y="152" fill="#a78bfa" font-size="12" font-weight="600" text-anchor="middle" font-family="sans-serif">code_explainer McpToolset</text>
+          <text x="200" y="172" fill="#34d399" font-size="10" text-anchor="middle" font-family="monospace">Tool Filter: read_text_file, list_dir, tree</text>
+          <text x="200" y="192" fill="#f43f5e" font-size="10" text-anchor="middle" font-family="sans-serif">&times; BLOCKED: write, edit, delete, move</text>
+
+          <!-- Redaction / Wall -->
+          <line x1="430" y1="20" x2="430" y2="240" stroke="#f43f5e" stroke-width="2" stroke-dasharray="6,4"/>
+          <text x="430" y="135" fill="#f43f5e" font-size="11" font-weight="700" text-anchor="middle" transform="rotate(-90 430 135)" font-family="sans-serif">SANITIZED SUBPROCESS BOUNDARY</text>
+
+          <!-- MCP Subprocess Box -->
+          <rect x="490" y="30" width="440" height="200" rx="10" fill="#090d16" stroke="#22d3ee" stroke-width="1.5"/>
+          <text x="710" y="60" fill="#22d3ee" font-size="14" font-weight="700" text-anchor="middle" font-family="sans-serif">Isolated Subprocess: Node.js (npx)</text>
+
+          <rect x="510" y="80" width="400" height="45" rx="6" fill="#111827" stroke="#1e293b"/>
+          <text x="710" y="100" fill="#f8fafc" font-size="11" text-anchor="middle" font-family="monospace">@modelcontextprotocol/server-filesystem@1.0.0</text>
+          <text x="710" y="116" fill="#10b981" font-size="10" text-anchor="middle" font-family="sans-serif">&bull; Sanitized ENV (PATH, SystemRoot only &bull; Zero API Keys)</text>
+
+          <rect x="510" y="140" width="400" height="70" rx="6" fill="#0b1329" stroke="#10b981"/>
+          <text x="710" y="165" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle" font-family="sans-serif">Allowed Directory Jail</text>
+          <text x="710" y="185" fill="#f8fafc" font-size="11" text-anchor="middle" font-family="monospace">D:\CodeLore\targets\Naive_RAG</text>
+          <text x="710" y="200" fill="#64748b" font-size="9" text-anchor="middle" font-family="sans-serif">Attempts to traverse outside this folder trigger AccessDenied</text>
+        </svg>
+        <div class="diagram-caption">Figure 3: Filesystem MCP security isolation boundary preventing API key exposure and jailing file access strictly to targets/Naive_RAG.</div>
+      </div>
+    </section>
+
+    <!-- SECTION J: Request Lifecycle Flow -->
+    <section id="lifecycle">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">07</span>
+          <h2>Deterministic Request Lifecycle Flow</h2>
+        </div>
+        <div class="badge badge-verified">Deterministic Callback Verified</div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 16px; margin-bottom: 8px;">The Engineering Solution to Small-Model Refusal Loops</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+          During live evaluation of 11B parameter models, the chat model frequently ignored valid tool outputs, initiating 15-call runaway hallucination loops. CodeLore resolves this via an architectural hybrid pattern:
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div style="background: var(--bg-surface); padding: 18px; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 12px; color: var(--cyan); font-weight: 700; margin-bottom: 6px;">1. State Writing in Tool</div>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              Tools write copy-ready markdown citations into <code>state["temp:final_text"]</code> and set <code>skip_summarization = True</code>.
+            </p>
+          </div>
+          <div style="background: var(--bg-surface); padding: 18px; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 12px; color: var(--violet); font-weight: 700; margin-bottom: 6px;">2. Turn Interception</div>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              The ADK <code>codelore_after_agent_callback</code> detects <code>temp:final_text</code> and delivers it directly to the user, completely bypassing model generation.
+            </p>
+          </div>
+          <div style="background: var(--bg-surface); padding: 18px; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="font-size: 12px; color: #fbbf24; font-weight: 700; margin-bottom: 6px;">3. Execution Loop Guard</div>
+            <p style="font-size: 12px; color: var(--text-muted);">
+              <code>loop_guard_before_tool_callback</code> blocks a 3rd call to the same tool or any repeat call with identical arguments, halting runaway loops.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION K: Testing Dashboard -->
+    <section id="testing">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">08</span>
+          <h2>Empirical Verification & Testing Dashboard</h2>
+        </div>
+        <div class="badge badge-verified">Empirical Data Only</div>
+      </div>
+
+      <div class="test-dashboard">
+        <div class="metric-box">
+          <div class="metric-title">
+            <span>Pytest Suite</span>
+            <span class="badge badge-verified">Passing</span>
+          </div>
+          <div class="metric-num" style="color: #34d399;">86 Passed</div>
+          <div class="metric-desc">4 skipped (live cloud credential gates) &bull; ~6s duration</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-title">
+            <span>Retrieval Hit@1</span>
+            <span class="badge badge-verified">Empirical</span>
+          </div>
+          <div class="metric-num" style="color: var(--cyan);">80.0%</div>
+          <div class="metric-desc">8 / 10 target analysis questions ranked #1</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-title">
+            <span>Retrieval Hit@5</span>
+            <span class="badge badge-verified">Empirical</span>
+          </div>
+          <div class="metric-num" style="color: var(--violet);">100.0%</div>
+          <div class="metric-desc">10 / 10 target analysis questions in top 5 chunks</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-title">
+            <span>Routing Accuracy</span>
+            <span class="badge badge-partial">Partial</span>
+          </div>
+          <div class="metric-num" style="color: #fbbf24;">62.5% &rarr; 100%</div>
+          <div class="metric-desc">5/8 on initial held-out &bull; 5/5 on first 5 final questions</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 14px; margin-bottom: 8px;">Evaluation Transparency Note</h3>
+        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+          Final live evaluation was stopped at question 5 (covering core lookups, outlines, and explanations). Diagnostic re-evaluation after Fix 2 verified EVAL_02 (embed_query: 1.68s) and EVAL_05 (upsert_to_vector_db: 3.21s). Questions 6–10 (covering not-found concepts and adversarial prompt injections) were stopped and not measured.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION L: Setup & Demo Commands -->
+    <section id="demo">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">09</span>
+          <h2>Setup Runbook & Instructor Demo Plan</h2>
+        </div>
+        <div class="badge badge-verified">Windows PowerShell</div>
+      </div>
+
+      <div class="card">
+        <span class="cmd-badge">1. Environment Setup</span>
+        <pre><code>cd d:\CodeLore\codelore
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# Copy .env.example to code_helper/.env and configure API keys</code></pre>
+
+        <span class="cmd-badge">2. Index Target Repository</span>
+        <pre><code>python code_helper/index_codebase.py</code></pre>
+
+        <span class="cmd-badge">3. Launch Interactive Assistant</span>
+        <pre><code>adk web
+# Open http://localhost:8000 and select 'code_helper'</code></pre>
+
+        <span class="cmd-badge">4. Run Offline Test Suite</span>
+        <pre><code>python -m pytest -q</code></pre>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 16px; margin-bottom: 14px; color: var(--text-main);">Instructor Demonstration Questions</h3>
+
+        <details open>
+          <summary>Demo Question 1: Symbol Definition Lookup (code_searcher)</summary>
+          <div class="details-content">
+            <p><strong>Question:</strong> <code>Where is the function embed_query defined in this codebase, and what parameters does it take?</code></p>
+            <p><strong>Expected Tool:</strong> <code>find_symbol("embed_query")</code> (Time: 1.68s)</p>
+            <p><strong>Evidence to Show:</strong></p>
+            <pre><code>Found 1 definition(s) for symbol 'embed_query':
+[1] embed_query(query: str, config: RAGConfig) - query_pipeline.py:27-86
+    Signature: def embed_query(</code></pre>
+            <p><strong>Verification:</strong> Open <code>targets/Naive_RAG/query_pipeline.py:27-86</code> to confirm exact line coordinates.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Demo Question 2: Copy-Ready File Outline (code_explainer)</summary>
+          <div class="details-content">
+            <p><strong>Question:</strong> <code>Outline config.py and list its classes and functions.</code></p>
+            <p><strong>Expected Tool:</strong> <code>show_file_outline("config.py")</code></p>
+            <p><strong>Evidence to Show:</strong> Lists <code>RAGConfig(BaseModel) - config.py:61-77</code> and <code>get_rag_config(...) - config.py:80-154</code>.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Demo Question 3: Dependency Mapping (architecture_mapper)</summary>
+          <div class="details-content">
+            <p><strong>Question:</strong> <code>Which files in this repository import upsert_to_vector_db?</code></p>
+            <p><strong>Expected Tool:</strong> <code>analyze_imports("upsert_to_vector_db")</code> (Time: 3.21s)</p>
+            <p><strong>Evidence to Show:</strong> <code>Imported by (1 reference(s)): indexer.py:27-27</code>.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- SECTION M: Release Roadmap -->
+    <section id="roadmap">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">10</span>
+          <h2>Product Release Roadmap</h2>
+        </div>
+        <div class="badge badge-verified">Phased Delivery</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+        <div class="card" style="border-top: 3px solid #10b981;">
+          <h3 style="font-size: 15px; margin-bottom: 8px; color: #34d399;">A. Mandatory Assignment Requirements</h3>
+          <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; line-height: 1.8;">
+            <li>5 ADK Agents: Boss + 4 Specialist Workers <span class="badge badge-verified">Built</span></li>
+            <li>5+ Custom Python Tools (6 implemented) <span class="badge badge-verified">Built</span></li>
+            <li>Read-Only Filesystem MCP Server integration <span class="badge badge-verified">Built</span></li>
+            <li>Custom RAG Pipeline (NVIDIA + Pinecone) <span class="badge badge-verified">Built</span></li>
+            <li>Strict line citations (path:start-end) <span class="badge badge-verified">Built</span></li>
+          </ul>
+        </div>
+
+        <div class="card" style="border-top: 3px solid var(--cyan);">
+          <h3 style="font-size: 15px; margin-bottom: 8px; color: var(--cyan);">B. Core CodeLore Enhancements</h3>
+          <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; line-height: 1.8;">
+            <li>Deterministic callback delivery (temp:final_text) <span class="badge badge-verified">Built</span></li>
+            <li>Execution loop guard before_tool_callback <span class="badge badge-verified">Built</span></li>
+            <li>AST-hybrid function-aware chunking <span class="badge badge-verified">Built</span></li>
+            <li>FastAPI SSE streaming backend server <span class="badge badge-verified">Built</span></li>
+            <li>React 19 Case Investigation UI <span class="badge badge-verified">Built</span></li>
+          </ul>
+        </div>
+
+        <div class="card" style="border-top: 3px solid var(--violet);">
+          <h3 style="font-size: 15px; margin-bottom: 8px; color: var(--violet);">C. Future Product Vision</h3>
+          <ul style="font-size: 12px; color: var(--text-muted); padding-left: 18px; line-height: 1.8;">
+            <li>Phase 10: Hybrid RAG (BM25 + Vector RRF) <span class="badge badge-planned">Planned</span></li>
+            <li>Phase 10: Multi-repo workspace switching <span class="badge badge-planned">Planned</span></li>
+            <li>Phase 11: Firebase/OAuth user authentication <span class="badge badge-planned">Planned</span></li>
+            <li>Phase 12: Asynchronous Redis indexing queue <span class="badge badge-planned">Planned</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION N: Glossary & Instructor Q&A -->
+    <section id="qa">
+      <div class="section-head">
+        <div class="section-head-title">
+          <span class="section-num">11</span>
+          <h2>Instructor Q&A & Technical Defense</h2>
+        </div>
+        <div class="badge badge-verified">15 Defended Answers</div>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary>1. Why is the Boss agent prohibited from calling tools directly?</summary>
+          <div class="details-content">
+            Giving tools to the Boss causes the coordinator to attempt speculative queries or answer prematurely. Enforcing zero tools guarantees single-responsibility intent classification and delegation via <code>transfer_to_agent</code> (<code>code_helper/agent.py:189</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>2. How do you prevent infinite transfer loops between agents?</summary>
+          <div class="details-content">
+            Workers are instantiated with <code>disallow_transfer_to_parent=True</code> and <code>disallow_transfer_to_peers=True</code> (<code>code_helper/agent.py:138-139</code>). Agent transfer is strictly one-way from Boss to the designated specialist.
+          </div>
+        </details>
+
+        <details>
+          <summary>3. What is the difference between Document RAG and Code RAG?</summary>
+          <div class="details-content">
+            Document RAG splits text by sentence or token count. Code RAG must respect language syntax: splitting a Python function in half breaks arguments, indentation, and variable scope, resulting in invalid citations.
+          </div>
+        </details>
+
+        <details>
+          <summary>4. What chunking strategy is implemented and why?</summary>
+          <div class="details-content">
+            <code>ast_hybrid</code> chunking (<code>code_helper/rag/chunker.py:114</code>). It creates one chunk per top-level function or class, windowing only oversized blocks (&gt;60 lines or &gt;3000 chars) with an 8-line overlap to preserve boundary context.
+          </div>
+        </details>
+
+        <details>
+          <summary>5. How did you solve the small-model tool refusal loop?</summary>
+          <div class="details-content">
+            Exact lookup tools store copy-ready citations into <code>state["temp:final_text"]</code> with <code>skip_summarization = True</code>. The ADK callback <code>codelore_after_agent_callback</code> delivers this text directly to the user, completely bypassing model generation (<code>code_helper/agent.py:80-91</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>6. How does the loop guard protect against runaway API billings?</summary>
+          <div class="details-content">
+            <code>loop_guard_before_tool_callback</code> tracks per-turn tool invocations. It blocks a 3rd call to the same tool or any repeated call with identical arguments, injecting a stop instruction (<code>code_helper/agent.py:35-62</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>7. Why does the embedder use asymmetric input types?</summary>
+          <div class="details-content">
+            NVIDIA's <code>nemotron-3-embed-1b</code> model uses asymmetric pooling: <code>input_type="passage"</code> optimizes internal attention for long code definitions during indexing, while <code>input_type="query"</code> optimizes for short search queries during retrieval.
+          </div>
+        </details>
+
+        <details>
+          <summary>8. How was MIN_SCORE = 0.35 calibrated?</summary>
+          <div class="details-content">
+            Calibrated empirically across 16 queries in <code>eval_runs/min_score_calibration.md</code>. 0.35 is the midpoint between the highest irrelevant query score (0.3016 for Slack webhook) and the lowest true code query (0.4049).
+          </div>
+        </details>
+
+        <details>
+          <summary>9. What prevents path traversal attacks like ../../etc/passwd?</summary>
+          <div class="details-content">
+            <code>safe_resolve()</code> resolves target paths and verifies they remain children of <code>target_root</code>. It rejects <code>..</code>, drive letters, colons, and Windows reserved device names with a <code>PathSecurityError</code> (<code>code_helper/tools/_paths.py:13-48</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>10. How do you prevent leaking API keys to the MCP subprocess?</summary>
+          <div class="details-content">
+            <code>build_filesystem_toolset()</code> sanitizes the child environment dictionary, passing only safe OS keys (<code>PATH</code>, <code>SystemRoot</code>, <code>TEMP</code>, <code>USERPROFILE</code>). NVIDIA and Pinecone keys are explicitly excluded (<code>code_helper/mcp_config.py:35-46</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>11. Why use Python AST instead of regular expressions?</summary>
+          <div class="details-content">
+            Regex cannot track multi-line function headers, nested classes, async defs, decorators, or parent-child scopes accurately. AST provides exact compiler-verified start and end line coordinates.
+          </div>
+        </details>
+
+        <details>
+          <summary>12. Does Filesystem MCP count toward the five custom tools?</summary>
+          <div class="details-content">
+            No. Filesystem MCP is an external Node.js subprocess protocol server. CodeLore implements six custom Python tools separately.
+          </div>
+        </details>
+
+        <details>
+          <summary>13. What is CodeLore's retrieval performance on Naive_RAG?</summary>
+          <div class="details-content">
+            Retrieval achieves <strong>80% Hit@1</strong>, <strong>90% Hit@3</strong>, and <strong>100% Hit@5</strong> across the 10 answerable target analysis questions in <code>eval_runs/min_score_calibration.md</code>.
+          </div>
+        </details>
+
+        <details>
+          <summary>14. What is a known failure mode of the current implementation?</summary>
+          <div class="details-content">
+            When the 11B chat model reads source text mentioning a function name, it occasionally hallucinates that the target function is an agent tool and attempts to call it (e.g. calling <code>chunk_document()</code> as a tool), triggering a tool-not-found error (<code>docs/known_limitations.md:12-19</code>).
+          </div>
+        </details>
+
+        <details>
+          <summary>15. Is Hybrid Retrieval implemented in CodeLore?</summary>
+          <div class="details-content">
+            No. Retrieval is pure dense vector retrieval via Pinecone. CodeLore implements <em>AST-Hybrid Chunking</em>, but true <em>Hybrid Retrieval</em> (BM25 + vector rank fusion) is planned for Phase 10.
+          </div>
+        </details>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>CodeLore &bull; Multi-Agent Code Intelligence &bull; Academic Architecture Build</p>
+      <p style="margin-top: 6px; color: var(--text-muted);">Self-contained documentation artifact generated for local browser inspection.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+flowchart TD
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    A[Agent Invokes Worker Tool] --> B{Tool Type?}
+    
+    B -->|Exact Lookup<br/>find_symbol, analyze_imports,<br/>show_file_outline, overview| C[Tool Formats Verified Text]:::searcher
+    C --> D[Store text in state 'temp:final_text']:::datastore
+    D --> E[Set skip_summarization = True]:::boss
+    E --> F[ADK codelore_after_agent_callback]:::boss
+    F --> G[Direct Content Return to User<br/>Model Generation Bypassed]:::datastore
+
+    B -->|Conceptual Explanation<br/>get_file_outline + MCP read| H[Store symbol ranges in 'temp:symbol_ranges']:::explainer
+    H --> I[Model Reads Source Text via MCP]:::external
+    I --> J[Model Synthesizes Explanation]:::external
+    J --> K[after_agent_callback Appends<br/>Verified Source Citations Footer]:::boss
+    K --> L[Deliver Grounded Explanation]:::datastore
+
+    J -.->|Model Outputs 'could not find'| M[codelore_after_model_callback<br/>Strips 'Verified from code:' label]:::external

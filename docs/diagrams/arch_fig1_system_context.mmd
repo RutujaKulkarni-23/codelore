@@ -1,0 +1,15 @@
+flowchart TD
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    User([Software Engineer]):::boss -->|Investigates code via browser| WebApp[CodeLore Web Application]:::searcher
+    WebApp -->|HTTP / SSE REST Requests| API[CodeLore FastAPI Server]:::boss
+    API -->|Chat completions via LiteLLM| NIM_Chat[NVIDIA NIM: meta/llama-3.2-11b]:::external
+    API -->|Vector embeddings via OpenAI client| NIM_Embed[NVIDIA NIM: nemotron-3-embed-1b]:::external
+    API -->|Similarity query & upsert| Pinecone[(Pinecone Serverless Index)]:::datastore
+    API -->|AST & Read-only File Access| TargetRepo[(Target Repository: Naive_RAG)]:::datastore

@@ -1,0 +1,22 @@
+stateDiagram-v2
+    [*] --> IDLE: Initialize Case State
+
+    IDLE --> INVESTIGATING: User submits question (event: start)
+    
+    state INVESTIGATING {
+        [*] --> SESSION_ACTIVE: event: session
+        SESSION_ACTIVE --> AGENT_ROUTED: event: routed
+        AGENT_ROUTED --> TOOL_RUNNING: event: tool_call
+        TOOL_RUNNING --> TOOL_FINISHED: event: tool_done
+        TOOL_FINISHED --> STREAMING_ANSWER: event: answer
+        STREAMING_ANSWER --> VERDICT_RECEIVED: event: verdict
+        VERDICT_RECEIVED --> CITATIONS_INDEXED: event: citations
+    }
+
+    INVESTIGATING --> SOLVED: event: done (citations verified)
+    INVESTIGATING --> COLD_CASE: event: done (verdict.kind == 'not_found')
+    INVESTIGATING --> INTERRUPTED: event: error (HTTP 429 or backend failure)
+
+    SOLVED --> INVESTIGATING: Follow-up question submitted
+    COLD_CASE --> INVESTIGATING: New query submitted
+    INTERRUPTED --> IDLE: User dismisses error card

@@ -1,0 +1,28 @@
+flowchart TD
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    subgraph Today ["Today (MVP Topology)"]
+        direction TB
+        C1[Client Browser] -->|HTTP / SSE| S1[FastAPI Server]:::boss
+        S1 --> M1[InMemorySessionService]:::datastore
+        S1 --> P1[(Pinecone: naive-rag)]:::datastore
+        S1 --> T1[(Local Target Folder)]:::datastore
+    end
+
+    subgraph Scale ["Target Architecture (At Scale)"]
+        direction TB
+        C2[Client Browser] --> LB[Cloud Load Balancer]:::external
+        LB --> API1[FastAPI Pod 1]:::boss
+        LB --> API2[FastAPI Pod 2]:::boss
+        API1 & API2 --> RedisSession[(Redis Distributed Sessions & Cache)]:::datastore
+        API1 & API2 --> Queue[(Celery / Redis Job Queue)]:::mapper
+        Queue --> Worker1[Indexing Worker 1]:::searcher
+        Queue --> Worker2[Indexing Worker 2]:::searcher
+        Worker1 & Worker2 --> PineconeScale[(Pinecone Multi-Namespace Index)]:::datastore
+    end

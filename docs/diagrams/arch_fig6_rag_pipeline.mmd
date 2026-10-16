@@ -1,0 +1,20 @@
+flowchart TD
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    A[Target Python Files] -->|scanner.py| B[Scan & Filter<br/>max_files: 2000, max_bytes: 200KB]:::boss
+    B -->|chunker.py| C[AST-Hybrid Chunking<br/>max_lines: 60, overlap: 8, max_chars: 3000]:::searcher
+    C -->|secrets_mask.py| D[Regex Secret Redaction<br/>Scrub API keys & tokens]:::explainer
+    D -->|embedder.py| E[NVIDIA NIM Embeddings<br/>nvidia/nemotron-3-embed-1b<br/>2048 Dimensions, Batch: 16]:::external
+    E -->|vector_store.py| F[Pinecone Serverless Upsert<br/>Metric: cosine, Namespace: naive-rag]:::datastore
+
+    G[User Query via code_searcher] -->|embedder.py| H[Live Query Vector<br/>2048 Dimensions]:::external
+    H -->|search.py| I[Pinecone Query<br/>top_k = 5]:::datastore
+    I --> J{Score >= MIN_SCORE 0.35?}
+    J -->|Yes| K[Return Formatted Chunks<br/>with file:lines headers]:::searcher
+    J -->|No| L[Filter Out Low Relevance Matches]:::external

@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant API as server/app.py
+    participant Runner as ADK Runner
+    participant Boss as Boss Agent
+    participant Worker as code_searcher
+    participant Tool as find_symbol
+    participant NIM as NVIDIA NIM (LiteLLM)
+
+    User->>API: POST /api/ask {question, session_id}
+    API->>API: Check IP rate limit & sanitize question
+    API-->>User: SSE event: session {turn_id, session_id}
+
+    API->>Runner: runner.run_async(new_message, max_llm_calls=8)
+    Runner->>Boss: Evaluate user inquiry
+    Boss->>NIM: LLM intent classification
+    NIM-->>Boss: transfer_to_agent("code_searcher")
+    Boss-->>Runner: Route transfer
+    API-->>User: SSE event: routed {agent: "Boss"}
+    API-->>User: SSE event: routed {agent: "Code Searcher"}
+
+    Runner->>Worker: Invoke code_searcher
+    Worker->>NIM: Plan tool selection
+    NIM-->>Worker: Call find_symbol("embed_query")
+    Worker->>API: Execute loop_guard_before_tool_callback
+    API-->>User: SSE event: tool_call {tool: "find_symbol", args: {symbol: "embed_query"}}
+
+    Worker->>Tool: find_symbol("embed_query")
+    Tool->>Tool: Parse AST, write temp:final_text & skip_summarization
+    Tool-->>Worker: Return formatted definition
+    API-->>User: SSE event: tool_done {tool: "find_symbol"}
+
+    Worker->>API: codelore_after_agent_callback
+    API->>API: Extract temp:final_text (model generation bypassed)
+    API-->>User: SSE event: answer {text: "Found 1 definition(s)..."}
+    API-->>User: SSE event: verdict {kind: "symbol", data: {...}}
+    API-->>User: SSE event: citations {items: [{path: "query_pipeline.py", start: 27, end: 86}]}
+    API-->>User: SSE event: done {seconds: 1.68}

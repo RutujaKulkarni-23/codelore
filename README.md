@@ -196,3 +196,15 @@ A complete analysis of failure modes and edge cases is maintained in [docs/known
 - **NVIDIA NIM Free-Tier Latency**: Inference latency ranged from ~2 seconds to ~22 minutes under remote API queuing.
 - **MCP `.env` Read Access**: The filesystem MCP server does not enforce file extension filters and can read `.env` files if they exist within its allowed root directory.
 - **Unverified Constraints**: Adversarial prompt injection defenses and high-load Pinecone free-tier rate limits were not evaluated in final testing.
+
+---
+
+## Documentation
+
+Comprehensive, presentation-quality technical documentation with architectural diagrams is available in the `docs/` folder:
+
+- **[Product Requirements Document (PRD)](file:///d:/CodeLore/codelore/docs/PRD.md)**: Product definition, user personas, acceptance criteria, user journey, empirical metrics, risks, and release roadmap.
+- **[System Architecture](file:///d:/CodeLore/codelore/docs/ARCHITECTURE.md)**: Container breakdown, multi-agent hierarchy, deterministic callbacks, reliability guards, RAG pipeline, and Architecture Decision Records (ADRs).
+- **[MVP Specification & Technology Stack](file:///d:/CodeLore/codelore/docs/MVP_TECH.md)**: MVP scope, exact package versions, REST and SSE API contracts, local setup runbook, test coverage, and cloud deployment guide.
+- **[System Design for Scale & Safety](file:///d:/CodeLore/codelore/docs/SYSTEM_DESIGN.md)**: Pinecone and CaseState data models, sequence flows, scaling blueprint, failure mode matrix, and STRIDE-light threat analysis.
+

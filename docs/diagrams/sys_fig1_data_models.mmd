@@ -1,0 +1,78 @@
+classDiagram
+    direction TB
+
+    class PineconeRecord {
+        +string id
+        +float[2048] values
+        +RecordMetadata metadata
+    }
+
+    class RecordMetadata {
+        +string path
+        +string symbol
+        +string kind
+        +int start_line
+        +int end_line
+        +string chunk_config_id
+        +string embed_model
+        +string content_hash
+        +string text
+        +bool truncated
+    }
+
+    class CaseState {
+        +string status
+        +string sessionId
+        +CaseTurn[] turns
+        +string activeAgent
+        +TimelineItem[] timeline
+        +string answer
+        +Verdict verdict
+        +Citation[] citations
+        +float durationSeconds
+        +string errorMessage
+        +int errorCode
+    }
+
+    class CaseTurn {
+        +string turn_id
+        +string question
+        +string status
+        +TimelineItem[] timeline
+        +string answer
+        +Verdict verdict
+        +Citation[] citations
+        +TurnStats stats
+        +string activeAgent
+    }
+
+    class TimelineItem {
+        +string id
+        +string type
+        +string agent
+        +string title
+        +string detail
+        +string status
+        +float timestamp
+    }
+
+    class Verdict {
+        +string kind
+        +string agent
+        +object data
+        +string text
+        +Citation[] citations
+        +string[] sources
+    }
+
+    class Citation {
+        +string path
+        +int start
+        +int end
+    }
+
+    PineconeRecord *-- RecordMetadata
+    CaseState *-- CaseTurn
+    CaseTurn *-- TimelineItem
+    CaseTurn *-- Verdict
+    Verdict *-- Citation

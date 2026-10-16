@@ -1,0 +1,26 @@
+flowchart LR
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    subgraph Built ["Built & Verified (Phases 1-9)"]
+        direction TB
+        P1["Phase 1-3: Core RAG & ADK Agents"]:::boss
+        P2["Phase 4-5: MCP Tools & Calibration"]:::searcher
+        P3["Phase 6: Deterministic Callbacks & Loop Guard"]:::explainer
+        P4["Phase 7-9: FastAPI Server, React UI & E2E Tests"]:::mapper
+    end
+
+    subgraph Planned ["Planned Releases (Phases 10-13)"]
+        direction TB
+        P10["Phase 10: Git Repo Importer & Sanitizer"]:::guide
+        P11["Phase 11: User Authentication & Quotas"]:::external
+        P12["Phase 12: Asynchronous Job Queue & Webhooks"]:::datastore
+        P13["Phase 13: Sandboxed Code Editing & Patching"]:::external
+    end
+
+    Built --> Planned

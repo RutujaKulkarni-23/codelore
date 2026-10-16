@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+    participant CLI as index_codebase.py
+    participant Scanner as scanner.py
+    participant Chunker as chunker.py
+    participant Masker as secrets_mask.py
+    participant Embedder as embedder.py
+    participant Store as vector_store.py
+    participant Pinecone as Pinecone API
+
+    CLI->>Scanner: scan_python_files(target_path, max_files=2000)
+    Scanner-->>CLI: Return valid file paths (skip binary & tests)
+
+    loop For Each Python File
+        CLI->>Chunker: chunk_source_file(text, strategy='ast_hybrid')
+        Chunker-->>CLI: Top-level function & class Chunks
+        CLI->>Masker: mask_secrets(chunk.text)
+        Masker-->>CLI: Masked text + scrub count
+    end
+
+    CLI->>Embedder: embed_documents(texts, batch_size=16)
+    Embedder-->>CLI: 2048-dim vectors (NVIDIA NIM)
+
+    CLI->>Store: upsert_chunks(index, chunks, vectors, namespace)
+    Store->>Pinecone: Upsert batch (max 1000 per request)
+    Pinecone-->>Store: Confirm record count
+    CLI->>Store: wait_until_count(namespace, expected_count)
+    Store-->>CLI: Verified namespace consistency

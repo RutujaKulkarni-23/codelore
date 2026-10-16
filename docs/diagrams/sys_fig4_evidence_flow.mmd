@@ -1,0 +1,17 @@
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Card as VerdictCard
+    participant Reducer as CaseState
+    participant Panel as EvidencePanel
+    participant API as GET /api/file
+    participant Viewer as CodeViewer
+
+    User->>Card: Click citation chip (e.g. indexer.py:27-27)
+    Card->>Reducer: Dispatch active citation selection
+    Reducer->>Panel: Update active path & line range
+    Panel->>API: GET /api/file?path=indexer.py
+    API->>API: safe_resolve() & mask_secrets()
+    API-->>Panel: Return {path, lines: [...]}
+    Panel->>Viewer: Render code text with line numbers
+    Viewer->>Viewer: Scroll to line 27 & apply glowing highlight (L27–27)

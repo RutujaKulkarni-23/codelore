@@ -1,0 +1,26 @@
+flowchart LR
+    classDef boss fill:#22d3ee,stroke:#0891b2,stroke-width:2px,color:#0f172a;
+    classDef searcher fill:#60a5fa,stroke:#2563eb,stroke-width:2px,color:#0f172a;
+    classDef explainer fill:#f0abfc,stroke:#c026d3,stroke-width:2px,color:#0f172a;
+    classDef mapper fill:#a78bfa,stroke:#7c3aed,stroke-width:2px,color:#0f172a;
+    classDef guide fill:#fbbf24,stroke:#d97706,stroke-width:2px,color:#0f172a;
+    classDef external fill:#94a3b8,stroke:#475569,stroke-width:2px,color:#0f172a;
+    classDef datastore fill:#34d399,stroke:#059669,stroke-width:2px,color:#0f172a;
+
+    subgraph Edge ["1. Edge Boundary"]
+        G1[IP Rate Limiter<br/>8 req / 10 min]:::external
+        G2[Demo Code Gate<br/>X-Demo-Code header]:::external
+    end
+
+    subgraph Input ["2. Input Validation"]
+        G3[Question Sanitizer<br/>Strip control chars<br/>Max 500 chars]:::boss
+        G4[Path Security<br/>safe_resolve blocks ..]:::boss
+    end
+
+    subgraph Runtime ["3. Agent Execution Guards"]
+        G5[ADK RunConfig<br/>max_llm_calls = 8]:::searcher
+        G6[Loop Guard Callback<br/>Max 2 calls/tool<br/>Max 1 identical args]:::explainer
+        G7[LiteLLM Config<br/>timeout = 90s<br/>num_retries = 1]:::external
+    end
+
+    Edge --> Input --> Runtime

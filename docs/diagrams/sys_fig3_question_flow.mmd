@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    actor Client as Browser UI
+    participant Server as server/app.py
+    participant Runner as ADK Runner
+    participant Boss as Boss Agent
+    participant Worker as Specialist Worker
+    participant Tool as AST / MCP Tool
+    participant Callback as after_agent_callback
+
+    Client->>Server: POST /api/ask {question, session_id}
+    Server->>Server: Validate rate limit & sanitize question
+    Server-->>Client: SSE: session {turn_id, session_id}
+
+    Server->>Runner: run_async(new_message, max_llm_calls=8)
+    Runner->>Boss: Evaluate user question
+    Boss-->>Runner: transfer_to_agent(worker_name)
+    Server-->>Client: SSE: routed {agent: "Boss"}
+    Server-->>Client: SSE: routed {agent: worker_name}
+
+    Runner->>Worker: Run assigned worker
+    Worker->>Tool: Execute tool (e.g. find_symbol)
+    Server-->>Client: SSE: tool_call {tool, args}
+    Tool->>Tool: Store result in temp:final_text
+    Tool-->>Worker: Return tool output
+    Server-->>Client: SSE: tool_done {tool}
+
+    Worker->>Callback: codelore_after_agent_callback
+    Callback-->>Runner: Return temp:final_text (Bypass LLM)
+    Server-->>Client: SSE: answer {text}
+    Server-->>Client: SSE: verdict {kind, data}
+    Server-->>Client: SSE: citations {items}
+    Server-->>Client: SSE: done {seconds}
